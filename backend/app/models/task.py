@@ -2,7 +2,7 @@ from sqlalchemy import Boolean,Column,DateTime,Enum,ForeignKey,Integer,String,Te
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import TIMESTAMP
-from database import Base
+from app.database import Base
 
 import uuid
 import enum
@@ -56,35 +56,3 @@ class Task(Base):
 
 
     labels = relationship("TaskLabel", back_populates="task", cascade="all, delete-orphan")
-
-
-
-class Subtask(Base):
-    __tablename__="subtasks"
-
-
-    id=Column(Uuid(as_uuid=True),primary_key=True,default=uuid.uuid4)
-    task_id=Column(Uuid(as_uuid=True),ForeignKey("tasks.id",ondelete="CASCADE"),nullable=False)
-
-
-    title=Column(String,nullable=False)
-    is_done=Column(Boolean,default=False,nullable=False)
-
-
-    task=relationship("Task",back_populates="subtasks")
-
-
-    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
-
-
-class TaskAssignee(Base):
-    __tablename__="task_assignees"
-
-
-    task_id=Column(Uuid(as_uuid=True),ForeignKey("tasks.id",ondelete="CASCADE"),nullable=False,primary_key=True)
-    user_id=Column(Uuid(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),nullable=False)
-
-
-    task=relationship("Task",back_populates="assignees")
-    user=relationship("User",back_populates="tasks_assigned")

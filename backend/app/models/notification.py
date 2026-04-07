@@ -1,7 +1,7 @@
 from sqlalchemy import JSON, Column,Integer,String,ForeignKey,Uuid,TIMESTAMP,Boolean,Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+from app.database import Base
 import uuid
 import enum
 

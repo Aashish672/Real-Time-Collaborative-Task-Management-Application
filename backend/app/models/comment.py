@@ -1,7 +1,7 @@
 from sqlalchemy import TIMESTAMP, Column, String, Text, ForeignKey, Uuid, DateTime, Enum, func
 from sqlalchemy.orm import relationship
 
-from database import Base
+from app.database import Base
 import uuid
 
 class Comment(Base):

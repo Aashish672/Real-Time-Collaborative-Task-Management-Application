@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel,EmailStr,ConfigDict,field_validator
 
 import uuid
@@ -75,3 +77,33 @@ class UserMe(UserPublic):
 class UserUpdate(BaseModel):
     full_name:str|None=None
     avatar_url:str|None=None
+
+
+class UserOAuth(BaseModel):
+    email:EmailStr
+    full_name:str|None=None
+    avatar_url:Optional[str]=None
+
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, new_password):
+        if len(new_password) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+
+        if not any(char.isupper() for char in new_password):
+            raise ValueError("Password must contain at least one uppercase letter")
+
+        if not any(char.islower() for char in new_password):
+            raise ValueError("Password must contain at least one lowercase letter")
+
+        if not any(char.isdigit() for char in new_password):
+            raise ValueError("Password must contain at least one digit")
+
+        if not any(char in "!@#$%^&*()_+-=[]{}|;':,.<>?/" for char in new_password):
+            raise ValueError("Password must contain at least one special character")
+
+        return new_password

@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import Column,Integer,String,ForeignKey,Uuid,TIMESTAMP,Enum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from database import Base
+from app.database import Base
 
 class Label(Base):
     __tablename__="labels"

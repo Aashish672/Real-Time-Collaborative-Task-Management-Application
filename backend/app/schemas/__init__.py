@@ -1,4 +1,4 @@
-from .user import UserRegistration, UserLogin, TokenResponse, RefreshTokenRequest, UserPublic, UserMe, UserUpdate
+from .user import UserRegistration, UserLogin, TokenResponse, RefreshTokenRequest, UserPublic, UserMe, UserUpdate, UserOAuth,ChangePassword
 from .workspace import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, WorkspaceMemberResponse
 from .project import ProjectCreate, ProjectUpdate, ProjectResponse
 from .task import TaskCreate, TaskUpdate, TaskResponse, SubtaskCreate, SubtaskResponse

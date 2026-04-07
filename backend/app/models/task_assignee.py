@@ -1,6 +1,6 @@
 from sqlalchemy import Column, ForeignKey, Uuid, TIMESTAMP, func
 from sqlalchemy.orm import relationship
-from database import Base
+from app.database import Base
 import uuid
 
 class TaskAssignee(Base):

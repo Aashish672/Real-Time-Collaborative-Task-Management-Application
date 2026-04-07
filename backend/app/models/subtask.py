@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, Column, String, ForeignKey, Uuid, TIMESTAMP, func
 from sqlalchemy.orm import relationship
-from database import Base
+from app.database import Base
 import uuid
 
 class Subtask(Base):
@@ -16,3 +16,6 @@ class Subtask(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     task = relationship("Task", back_populates="subtasks")
+
+
+    

@@ -1,7 +1,6 @@
-from sqlalchemy import Boolean, Column,Integer,String,TIMESTAMP,Uuid
+from sqlalchemy import Boolean, Column,Integer,String,TIMESTAMP,Uuid, func
 from sqlalchemy.orm import relationship
-from sqlalchemy.orm import func
-from database import Base
+from app.database import Base
 import uuid
 
 class User(Base):

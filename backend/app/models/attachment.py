@@ -1,6 +1,6 @@
 from sqlalchemy  import TIMESTAMP, Column, String, ForeignKey, Uuid, DateTime, func
 from sqlalchemy.orm import relationship
-from database import Base
+from app.database import Base
 import uuid
 
 class Attachment(Base):
