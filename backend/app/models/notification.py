@@ -1,5 +1,6 @@
-from sqlalchemy import Column,Integer,String,ForeignKey,Uuid,TIMESTAMP,Boolean,Enum
+from sqlalchemy import JSON, Column,Integer,String,ForeignKey,Uuid,TIMESTAMP,Boolean,Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from database import Base
 import uuid
 import enum
@@ -20,10 +21,13 @@ class Notification(Base):
     type=Column(Enum(NotificationType),nullable=False)
 
 
-    payload=Column(String,nullable=False)
+    payload=Column(JSON,nullable=False)
 
 
     is_read=Column(Boolean,default=False,nullable=False)
 
     
-    created_at=Column(TIMESTAMP,nullable=False)
+    created_at=Column(TIMESTAMP(timezone=True),server_default=func.now(),nullable=False)
+
+
+    user=relationship("User",back_populates="notifications")

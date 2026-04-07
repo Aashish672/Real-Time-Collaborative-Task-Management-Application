@@ -1,5 +1,7 @@
 from sqlalchemy import Boolean,Column,DateTime,Enum,ForeignKey,Integer,String,Text,Uuid,UniqueConstraint
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from sqlalchemy import TIMESTAMP
 from database import Base
 
 import uuid
@@ -34,7 +36,7 @@ class Task(Base):
 
 
     priority=Column(Enum(TaskPriority),default=TaskPriority.medium,nullable=False,index=True)
-    due_date=Column(DateTime,nullable=True)
+    due_date=Column(DateTime(timezone=True),nullable=True)
 
 
     created_by=Column(Uuid(as_uuid=True),ForeignKey("users.id",ondelete="SET NULL"),nullable=True)
@@ -42,10 +44,18 @@ class Task(Base):
 
     project=relationship("Project",back_populates="tasks")
     subtasks=relationship("Subtask",back_populates="task",cascade="all, delete-orphan")
-    assignee=relationship("TaskAssignee",back_populates="task",cascade="all, delete-orphan")
+    assignees=relationship("TaskAssignee",back_populates="task",cascade="all, delete-orphan")
     creator=relationship("User",back_populates="tasks_created")
     comments=relationship("Comment",back_populates="task",cascade="all, delete-orphan")
     attachments=relationship("Attachment",back_populates="task",cascade="all, delete-orphan")
+    task_labels=relationship("TaskLabel",back_populates="task",cascade="all, delete-orphan")
+
+
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+    labels = relationship("TaskLabel", back_populates="task", cascade="all, delete-orphan")
 
 
 
@@ -64,13 +74,17 @@ class Subtask(Base):
     task=relationship("Task",back_populates="subtasks")
 
 
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
 class TaskAssignee(Base):
     __tablename__="task_assignees"
 
 
-    task_id=Column(Uuid(as_uuid=True),ForeignKey("tasks.id",ondelete="CASCADE"),nullable=False)
+    task_id=Column(Uuid(as_uuid=True),ForeignKey("tasks.id",ondelete="CASCADE"),nullable=False,primary_key=True)
     user_id=Column(Uuid(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),nullable=False)
 
 
-    task=relationship("Task",back_populates="assignee")
+    task=relationship("Task",back_populates="assignees")
     user=relationship("User",back_populates="tasks_assigned")

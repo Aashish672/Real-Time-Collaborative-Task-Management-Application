@@ -18,11 +18,11 @@ class UserRegistration(BaseModel):
             raise ValueError("Password must be at least 8 characters long")
         
 
-        if(not any(char.isUpper() for char in password)):
+        if(not any(char.isupper() for char in password)):
             raise ValueError("Password must contain at least one uppercase letter")
         
 
-        if(not any(char.isLower() for char in password)):
+        if(not any(char.islower() for char in password)):
             raise ValueError("Password must contain at least one Lowercase letter")
         
 
@@ -60,7 +60,7 @@ class UserBase(BaseModel):
 
 
 class UserPublic(UserBase):
-    model_config=ConfigDict(extra="forbid")
+    model_config=ConfigDict(extra="forbid",from_attributes=True)
 
 
     id:uuid.UUID
@@ -70,7 +70,6 @@ class UserPublic(UserBase):
 
 class UserMe(UserPublic):
     is_verified:bool
-    updated_at:datetime
 
 
 class UserUpdate(BaseModel):

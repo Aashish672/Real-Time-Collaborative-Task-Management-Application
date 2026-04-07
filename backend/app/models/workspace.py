@@ -4,6 +4,8 @@ from database import Base
 import uuid
 import enum
 
+from sqlalchemy.sql import func
+
 class WorkspaceRole(enum.Enum):
     owner="owner"
     admin="admin"
@@ -26,15 +28,18 @@ class Workspace(Base):
     projects=relationship("Project",back_populates="workspace",cascade="all, delete-orphan")
 
 
-    created_at=Column(TIMESTAMP,nullable=False)
+    created_at=Column(TIMESTAMP,server_default=func.now(),nullable=False)
+
+
+    labels = relationship("Label", back_populates="workspace", cascade="all, delete-orphan")
 
 
 class WorkspaceMember(Base):
     __tablename__="workspace_members"
 
 
-    workspace_id=Column(Uuid(as_uuid=True),ForeignKey("workspaces.id",ondelete="CASCADE"),nullable=False)
-    user_id=Column(Uuid(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),nullable=False)
+    workspace_id=Column(Uuid(as_uuid=True),ForeignKey("workspaces.id",ondelete="CASCADE"),nullable=False,primary_key=True)
+    user_id=Column(Uuid(as_uuid=True),ForeignKey("users.id",ondelete="CASCADE"),nullable=False,primary_key=True)
     role=Column(Enum(WorkspaceRole),nullable=False)
 
     workspace=relationship("Workspace",back_populates="members")
