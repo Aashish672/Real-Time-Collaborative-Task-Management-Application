@@ -3,7 +3,8 @@ from fastapi import APIRouter,Depends,HTTPException,status
 import uuid
 
 
-from app import schemas,models,crud
+from app import schemas,models
+from app.crud import user as crud
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 
