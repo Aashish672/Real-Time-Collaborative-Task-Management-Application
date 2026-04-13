@@ -33,10 +33,9 @@ class Task(Base):
     title=Column(String,nullable=False)
     description=Column(Text,nullable=True)
     status=Column(Enum(TaskStatus),default=TaskStatus.todo,nullable=False,index=True)
-
-
     priority=Column(Enum(TaskPriority),default=TaskPriority.medium,nullable=False,index=True)
     due_date=Column(DateTime(timezone=True),nullable=True)
+    position=Column(Integer, default=0, nullable=False)
 
 
     created_by=Column(Uuid(as_uuid=True),ForeignKey("users.id",ondelete="SET NULL"),nullable=True)
