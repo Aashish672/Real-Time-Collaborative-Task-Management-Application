@@ -37,3 +37,58 @@ from .project import (
     change_project_status,
     delete_project
 )
+
+from .task import (
+    create_task,
+    create_subtask,
+    get_task,
+    list_project_tasks,
+    filter_tasks,
+    get_user_assigned_tasks,
+    get_subtasks,
+    task_statistics,
+    update_task,
+    update_task_status,
+    update_task_priority,
+    update_subtask,
+    toggle_subtask_done,
+    add_label_to_task,
+    reorder_tasks,
+    delete_task,
+    delete_subtask,
+    remove_task_label,
+    remove_assignee,
+    assign_user_to_task
+)
+
+from .comment import (
+    create_comment,
+    get_task_comments,
+    get_comment,
+    update_comment,
+    delete_comment
+)
+
+from .label import (
+    create_label,
+    get_label,
+    list_workspace_labels,
+    update_label,
+    delete_label
+)
+
+from .attachment import (
+    create_attachment,
+    get_task_attachments,
+    get_attachment,
+    delete_attachment
+)
+
+from .notification import (
+    get_user_notifications,
+    get_unread_count,
+    mark_notification_read,
+    mark_all_read,
+    delete_notification,
+    create_notification
+)

@@ -8,7 +8,7 @@ from app import models,schemas
 def create_task(db: Session,project_id:uuid.UUID,creator_id:uuid.UUID,body:schemas.TaskCreate): 
     new_task=models.Task(
         project_id=project_id,
-        creator_id=creator_id,
+        created_by=creator_id,
         title=body.title,
         description=body.description,
         status=body.status,

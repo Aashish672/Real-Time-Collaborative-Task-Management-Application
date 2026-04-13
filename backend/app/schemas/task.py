@@ -47,16 +47,24 @@ class TaskUpdate(BaseModel):
     due_date: datetime | None = None
 
 
+from .user import UserPublic
+from .label import LabelResponse
+
 class TaskResponse(TaskBase):
     model_config = ConfigDict(from_attributes=True)
     
     id: uuid.UUID
     project_id: uuid.UUID
-    status: str
-    priority: str
+    status: TaskStatus
+    priority: TaskPriority
     created_by: uuid.UUID | None
     
+    created_at: datetime
+    updated_at: datetime
+
     subtasks: List[SubtaskResponse] = []
+    labels: List[LabelResponse] = []
+
 
 
 class TaskStatusUpdate(BaseModel):

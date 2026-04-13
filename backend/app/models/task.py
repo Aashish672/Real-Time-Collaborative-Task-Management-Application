@@ -53,5 +53,3 @@ class Task(Base):
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
 
-
-    labels = relationship("TaskLabel", back_populates="task", cascade="all, delete-orphan")
