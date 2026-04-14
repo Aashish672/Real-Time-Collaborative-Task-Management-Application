@@ -9,9 +9,12 @@ class WorkspaceMemberBase(BaseModel):
     role: str
 
 
+from .user import UserPublic
+
 class WorkspaceMemberResponse(WorkspaceMemberBase):
     model_config = ConfigDict(from_attributes=True)
     workspace_id: uuid.UUID
+    user: UserPublic
 
 
 class WorkspaceBase(BaseModel):
@@ -38,7 +41,11 @@ class WorkspaceResponse(WorkspaceBase):
 
 
 class WorkspaceStatisticsResponse(BaseModel):
-    total_members:int
+    total_members: int
+    total_projects: int
+    total_tasks: int
+    active_tasks: int
+    completion_rate: float
 
 
 class WorkspaceSlugUpdate(BaseModel):

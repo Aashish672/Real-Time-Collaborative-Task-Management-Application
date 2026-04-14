@@ -29,7 +29,8 @@ class User(Base):
 
 
     tasks_created=relationship("Task",back_populates="creator")
-    tasks_assigned=relationship("TaskAssignee",back_populates="user")
+    task_assignee_links=relationship("TaskAssignee",back_populates="user")
+    tasks_assigned=relationship("Task", secondary="task_assignees", back_populates="assignees", viewonly=True)
     comments=relationship("Comment",back_populates="author")
 
 

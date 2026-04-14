@@ -5,8 +5,8 @@ from sqlalchemy import asc
 from app import models,schemas
 
 
-def create_task(db: Session,project_id:uuid.UUID,creator_id:uuid.UUID,body:schemas.TaskCreate): 
-    new_task=models.Task(
+def create_task(db: Session, project_id: uuid.UUID, creator_id: uuid.UUID, body: schemas.TaskCreate): 
+    new_task = models.Task(
         project_id=project_id,
         created_by=creator_id,
         title=body.title,
@@ -15,8 +15,21 @@ def create_task(db: Session,project_id:uuid.UUID,creator_id:uuid.UUID,body:schem
         priority=body.priority,
         due_date=body.due_date
     )
-
     db.add(new_task)
+    db.flush()  # Generate ID for relationships
+
+    # Add assignees if provided
+    if body.assignee_ids:
+        for user_id in body.assignee_ids:
+            assignee = models.TaskAssignee(task_id=new_task.id, user_id=user_id)
+            db.add(assignee)
+
+    # Add labels if provided
+    if body.label_ids:
+        for label_id in body.label_ids:
+            task_label = models.TaskLabel(task_id=new_task.id, label_id=label_id)
+            db.add(task_label)
+
     db.commit()
     db.refresh(new_task)
     return new_task

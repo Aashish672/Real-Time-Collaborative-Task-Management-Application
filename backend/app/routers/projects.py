@@ -21,12 +21,12 @@ def create_project(body:schemas.ProjectCreate,workspace_id:uuid.UUID,db:Session=
     new_project=crud.create_project(db=db,body=body,workspace_id=workspace_id)
     return new_project
 
-@project_router.get("/projects/{project_id}")
+@project_router.get("/projects/{project_id}", response_model=schemas.ProjectResponse)
 def get_project(project_id:uuid.UUID,db:Session=Depends(get_db)):
     return crud.get_project(db=db,project_id=project_id)
 
 
-@project_router.get("/workspaces/{workspace_id}/projects")
+@project_router.get("/workspaces/{workspace_id}/projects", response_model=List[schemas.ProjectResponse])
 def list_workspace_project(workspace_id:uuid.UUID,db:Session=Depends(get_db)):
     return crud.list_workspace_projects(db=db,workspace_id=workspace_id)
 

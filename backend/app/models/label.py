@@ -22,6 +22,7 @@ class Label(Base):
 
     workspace=relationship("Workspace",back_populates="labels")
     task_labels=relationship("TaskLabel",back_populates="label",cascade="all, delete-orphan")
+    tasks=relationship("Task", secondary="task_labels", back_populates="labels", viewonly=True)
 
 
 

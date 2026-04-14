@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 import uuid
 from app.database import get_db
 from app import models
-from app import models
-from app.dependencies import get_current_user, get_workspace_member
+from app.dependencies import get_current_user
+from .workspace import check_workspace_member, get_workspace_member
 
 
 def get_valid_task(
@@ -22,16 +22,8 @@ def require_task_member(
         current_user: models.User = Depends(get_current_user),
         db: Session = Depends(get_db)
 ) -> models.Task:
-    assignee = db.query(models.TaskAssignee).filter(
-        models.TaskAssignee.task_id == task.id,
-        models.TaskAssignee.user_id == current_user.id
-    ).first()
-
-    if not assignee:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not assigned to this task"
-        )
+    # Any member of the workspace can view/edit tasks
+    check_workspace_member(db, task.project.workspace_id, current_user.id)
     return task
 
 

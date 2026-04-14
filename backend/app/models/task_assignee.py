@@ -11,5 +11,5 @@ class TaskAssignee(Base):
 
     assigned_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
-    task = relationship("Task", back_populates="assignees")
-    user = relationship("User", back_populates="tasks_assigned")
+    task = relationship("Task", back_populates="assignee_links")
+    user = relationship("User", back_populates="task_assignee_links")

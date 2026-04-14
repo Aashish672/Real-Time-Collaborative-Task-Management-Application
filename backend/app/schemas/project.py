@@ -8,7 +8,7 @@ class ProjectBase(BaseModel):
     deadline: datetime | None = None
 
 class ProjectCreate(ProjectBase):
-    owner_id: uuid.UUID
+    owner_id: uuid.UUID | None = None
 
 class ProjectUpdate(BaseModel):
     name: str | None = None

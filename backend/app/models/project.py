@@ -5,11 +5,11 @@ from app.database import Base
 import uuid
 import enum
 
-class ProjectStatus(enum.Enum):
+class ProjectStatus(str, enum.Enum):
     active="active"
     archived="archived"
     in_progress="in_progress"
-    completed="completed"   
+    completed="completed"
 
 
 class Project(Base):

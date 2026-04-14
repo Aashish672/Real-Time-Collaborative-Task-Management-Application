@@ -25,6 +25,8 @@ def verify_password(plain_password:str,hashed_password:str):
     return pwd_context.verify(plain_password,hashed_password)
 
 
+from app.crud.workspace import create_workspace
+
 def register(db:Session,body:schemas.UserRegistration):
     is_user=db.query(models.User).filter(models.User.email==body.email).first()
 
@@ -36,6 +38,14 @@ def register(db:Session,body:schemas.UserRegistration):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # Create default workspace
+    create_workspace(
+        db=db, 
+        body=schemas.WorkspaceCreate(name=f"{new_user.full_name}'s Workspace"), 
+        user_id=new_user.id
+    )
+
     return new_user
 
 
@@ -63,6 +73,12 @@ def oauth_register(db:Session,body:schemas.UserOAuth):
     db.commit()
     db.refresh(new_user)
 
+    # Create default workspace
+    create_workspace(
+        db=db, 
+        body=schemas.WorkspaceCreate(name=f"{new_user.full_name}'s Workspace"), 
+        user_id=new_user.id
+    )
 
     return new_user
 

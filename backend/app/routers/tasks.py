@@ -11,6 +11,9 @@ from app.dependencies import get_current_user
 from app.dependencies.project import require_project_member
 from app.dependencies.task import require_task_member, require_task_admin
 
+
+from app.services.ai import generate_subtasks_from_title
+
 router = APIRouter(tags=["Tasks"])
 
 
@@ -193,3 +196,21 @@ def task_statistics(
     project: models.Project = Depends(require_project_member)
 ):
     return crud.task_statistics(db=db, project_id=project.id)
+
+
+
+@router.post("/tasks/{task_id}/generate-subtasks",status_code=status.HTTP_201_CREATED)
+def auto_generate_subtasks(
+    task_id:uuid.UUID,
+    db:Session=Depends(get_db),
+    task:models.Task=Depends(require_task_member)):
+
+    ai_subtasks=generate_subtasks_from_title(task.title,task.description)
+    created_subtasks=[]
+
+    for st_data in ai_subtasks:
+        subtask_body = schemas.SubtaskCreate(title=st_data["title"], is_done=False)
+        new_st = crud.create_subtask(db=db, task_id=task.id, body=subtask_body)
+        created_subtasks.append(new_st)
+        
+    return {"detail": f"Successfully generated {len(created_subtasks)} subtasks", "subtasks": created_subtasks}

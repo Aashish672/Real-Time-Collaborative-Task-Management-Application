@@ -8,10 +8,15 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+import traceback
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
 origins=[
     "http://localhost:5173",
     "http://localhost:8000",
     "http://localhost:8080",
+    "http://localhost:8081",
 ]
 
 app.add_middleware(
@@ -22,6 +27,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"Unhandled Exception in request: {request.method} {request.url}")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error": str(exc)},
+        # Injecting CORS header so the browser doesn't hide the 500 error
+        headers={"Access-Control-Allow-Origin": request.headers.get("origin", "*")}
+    )
+
 app.include_router(auth.auth_routes)
 app.include_router(user_router.user_routes)
 app.include_router(workspaces.router)
@@ -30,4 +46,4 @@ app.include_router(tasks.router)
 app.include_router(comments.router)
 app.include_router(label.router)
 app.include_router(notifications.router)
-app.include_router(attachment.router)
+app.include_router(attachment.router)

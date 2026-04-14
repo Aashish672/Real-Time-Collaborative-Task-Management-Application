@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from .user import UserPublic
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -37,6 +38,8 @@ class TaskBase(BaseModel):
 class TaskCreate(TaskBase):
     status: TaskStatus = TaskStatus.todo
     priority: TaskPriority = TaskPriority.medium
+    assignee_ids: List[uuid.UUID] | None = None
+    label_ids: List[uuid.UUID] | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -49,6 +52,7 @@ class TaskUpdate(BaseModel):
 
 from .user import UserPublic
 from .label import LabelResponse
+from .comment import CommentResponse
 
 class TaskResponse(TaskBase):
     model_config = ConfigDict(from_attributes=True)
@@ -64,6 +68,8 @@ class TaskResponse(TaskBase):
 
     subtasks: List[SubtaskResponse] = []
     labels: List[LabelResponse] = []
+    assignees: List[UserPublic] = []
+    comments: List[CommentResponse] = []
 
 
 

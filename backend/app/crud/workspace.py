@@ -57,8 +57,31 @@ def get_workspaces_slug(db:Session,slug:str):
 
 
 def workspace_statistics(db:Session,workspace_id:uuid.UUID):
-    total_members=db.query(models.WorkspaceMember).filter(models.WorkspaceMember.workspace_id==workspace_id).count()
-    return {"total_members": total_members}
+    total_members = db.query(models.WorkspaceMember).filter(models.WorkspaceMember.workspace_id == workspace_id).count()
+    
+    total_projects = db.query(models.Project).filter(models.Project.workspace_id == workspace_id).count()
+    
+    # Total tasks across all projects in the workspace
+    total_tasks = db.query(models.Task).join(models.Project).filter(models.Project.workspace_id == workspace_id).count()
+    
+    # Active tasks (status != 'done')
+    active_tasks = db.query(models.Task).join(models.Project).filter(
+        models.Project.workspace_id == workspace_id,
+        models.Task.status != "done"
+    ).count()
+    
+    completion_rate = 0.0
+    if total_tasks > 0:
+        done_tasks = total_tasks - active_tasks
+        completion_rate = (done_tasks / total_tasks) * 100
+        
+    return {
+        "total_members": total_members,
+        "total_projects": total_projects,
+        "total_tasks": total_tasks,
+        "active_tasks": active_tasks,
+        "completion_rate": round(completion_rate, 1)
+    }
 
 
 def update_workspace(db:Session,workspace_id:uuid.UUID,body:schemas.WorkspaceUpdate):

@@ -8,7 +8,7 @@ import uuid
 import enum
 from datetime import datetime
 
-class TaskStatus(enum.Enum):
+class TaskStatus(str, enum.Enum):
     todo="todo"
     in_progress="in_progress"
     in_review="in_review"
@@ -16,7 +16,7 @@ class TaskStatus(enum.Enum):
     done="done"
 
 
-class TaskPriority(enum.Enum):
+class TaskPriority(str, enum.Enum):
     low="low"
     medium="medium"
     high="high"
@@ -43,11 +43,13 @@ class Task(Base):
 
     project=relationship("Project",back_populates="tasks")
     subtasks=relationship("Subtask",back_populates="task",cascade="all, delete-orphan")
-    assignees=relationship("TaskAssignee",back_populates="task",cascade="all, delete-orphan")
+    assignee_links=relationship("TaskAssignee",back_populates="task",cascade="all, delete-orphan")
+    assignees=relationship("User", secondary="task_assignees", back_populates="tasks_assigned", viewonly=True)
     creator=relationship("User",back_populates="tasks_created")
     comments=relationship("Comment",back_populates="task",cascade="all, delete-orphan")
     attachments=relationship("Attachment",back_populates="task",cascade="all, delete-orphan")
     task_labels=relationship("TaskLabel",back_populates="task",cascade="all, delete-orphan")
+    labels=relationship("Label", secondary="task_labels", back_populates="tasks", viewonly=True)
 
 
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
