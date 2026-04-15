@@ -6,10 +6,22 @@ wait_for_service() {
     local host=$1
     local port=$2
     local name=$3
-    echo "waiting for $name ($host:$port)..."
-    until python -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('$host', $port))" > /dev/null 2>&1; do
-        echo "$name is unavailable - sleeping"
-        sleep 1
+    echo "🔍 Testing connectivity to $name ($host:$port)..."
+    until python -c "
+import socket
+import sys
+try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(2)
+    s.connect(('$host', $port))
+    s.close()
+    sys.exit(0)
+except Exception as e:
+    print(f'❌ Connection to $name failed: {e}')
+    sys.exit(1)
+" ; do
+        echo "⏳ $name is unavailable - retrying in 2s..."
+        sleep 2
     done
     echo "✅ $name is up!"
 }
