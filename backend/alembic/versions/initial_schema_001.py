@@ -8,6 +8,7 @@ Create Date: 2026-04-15
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision = "initial_schema_001"
 down_revision = None
@@ -93,7 +94,11 @@ def upgrade():
         "workspace_members",
         sa.Column("workspace_id", sa.UUID(), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True),
         sa.Column("user_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("role", sa.Enum(name="workspacerole", create_type=False), nullable=False),
+        sa.Column(
+            "role",
+            postgresql.ENUM("owner", "admin", "member", "viewer", name="workspacerole", create_type=False),
+            nullable=False,
+        ),
     )
 
     # -----------------------------
@@ -105,10 +110,20 @@ def upgrade():
         sa.Column("email", sa.String(), nullable=False),
         sa.Column("workspace_id", sa.UUID(), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
         sa.Column("invited_by_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("role", sa.Enum(name="workspacerole", create_type=False), server_default=sa.text("'member'"), nullable=False),
+        sa.Column(
+            "role",
+            postgresql.ENUM("owner", "admin", "member", "viewer", name="workspacerole", create_type=False),
+            server_default=sa.text("'member'"),
+            nullable=False,
+        ),
         sa.Column("token", sa.String(), nullable=False, unique=True),
         sa.Column("expires_at", sa.TIMESTAMP(), nullable=False),
-        sa.Column("status", sa.Enum(name="invitationstatus", create_type=False), server_default=sa.text("'pending'"), nullable=False),
+        sa.Column(
+            "status",
+            postgresql.ENUM("pending", "accepted", "revoked", name="invitationstatus", create_type=False),
+            server_default=sa.text("'pending'"),
+            nullable=False,
+        ),
         sa.Column("created_at", sa.TIMESTAMP(), server_default=sa.func.now(), nullable=False),
     )
 
@@ -123,7 +138,12 @@ def upgrade():
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("description", sa.String()),
         sa.Column("deadline", sa.TIMESTAMP(timezone=True)),
-        sa.Column("status", sa.Enum(name="projectstatus", create_type=False), server_default=sa.text("'active'"), nullable=False),
+        sa.Column(
+            "status",
+            postgresql.ENUM("active", "archived", "in_progress", "completed", name="projectstatus", create_type=False),
+            server_default=sa.text("'active'"),
+            nullable=False,
+        ),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
     )
@@ -137,8 +157,18 @@ def upgrade():
         sa.Column("project_id", sa.UUID(), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
         sa.Column("title", sa.String(), nullable=False),
         sa.Column("description", sa.Text()),
-        sa.Column("status", sa.Enum(name="taskstatus", create_type=False), server_default=sa.text("'todo'"), nullable=False),
-        sa.Column("priority", sa.Enum(name="taskpriority", create_type=False), server_default=sa.text("'medium'"), nullable=False),
+        sa.Column(
+            "status",
+            postgresql.ENUM("todo", "in_progress", "in_review", "canceled", "done", name="taskstatus", create_type=False),
+            server_default=sa.text("'todo'"),
+            nullable=False,
+        ),
+        sa.Column(
+            "priority",
+            postgresql.ENUM("low", "medium", "high", "urgent", name="taskpriority", create_type=False),
+            server_default=sa.text("'medium'"),
+            nullable=False,
+        ),
         sa.Column("due_date", sa.DateTime(timezone=True)),
         sa.Column("position", sa.Integer(), server_default=sa.text("0"), nullable=False),
         sa.Column("created_by", sa.UUID(), sa.ForeignKey("users.id", ondelete="SET NULL")),
