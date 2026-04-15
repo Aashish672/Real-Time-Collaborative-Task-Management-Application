@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -15,7 +15,13 @@ export default function Signup() {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const { login: authLogin } = useAuth();
+    const { user, token, isLoading, login: authLogin } = useAuth();
+
+    useEffect(() => {
+        if (!isLoading && user && token) {
+            navigate("/");
+        }
+    }, [user, token, isLoading, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,7 +51,7 @@ export default function Signup() {
                 headers: { Authorization: `Bearer ${loginResponse.access_token}` },
             });
 
-            authLogin(loginResponse.access_token, userData);
+            authLogin(loginResponse.access_token, loginResponse.refresh_token, userData);
             toast.success("Account created successfully!");
             navigate("/");
         } catch (error: any) {
@@ -85,7 +91,7 @@ export default function Signup() {
                                         headers: { Authorization: `Bearer ${oauthResponse.access_token}` },
                                     });
 
-                                    authLogin(oauthResponse.access_token, userData);
+                                    authLogin(oauthResponse.access_token, oauthResponse.refresh_token, userData);
                                     toast.success("Signed in with Google");
                                     navigate("/");
                                 } catch (error) {
