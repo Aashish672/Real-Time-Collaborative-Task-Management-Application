@@ -83,7 +83,7 @@ services:
     restart: always
     command: python -m app.worker.webhook_worker
     env_file:
-      - .env.prod
+      - .env
     depends_on:
       rabbitmq:
         condition: service_started
