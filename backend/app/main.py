@@ -1,18 +1,32 @@
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 import os
+from contextlib import asynccontextmanager
+from decouple import config
 
 from app.database import Base, engine
 from app.routers import auth, user as user_router, workspaces, projects, tasks, comments, label, notifications, attachment, websockets
+from app.core.redis import connect_redis, disconnect_redis
+from app.core.rabbitmq import connect_rabbitmq, disconnect_rabbitmq
 
 # Ensure uploads directory exists
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
 
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)  # Disabled in favor of Alembic migrations
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await connect_redis()
+    await connect_rabbitmq()
+    yield
+    # Shutdown
+    await disconnect_redis()
+    await disconnect_rabbitmq()
+
+app = FastAPI(lifespan=lifespan)
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
@@ -20,12 +34,9 @@ import traceback
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-origins=[
-    "http://localhost:5173",
-    "http://localhost:8000",
-    "http://localhost:8080",
-    "http://localhost:8081",
-]
+# CORS settings
+raw_origins = config("ALLOWED_ORIGINS", default="http://localhost:5173,http://localhost:8000,http://localhost:8080")
+origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,

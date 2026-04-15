@@ -28,7 +28,7 @@ export default function Login() {
         headers: { Authorization: `Bearer ${loginResponse.access_token}` },
       });
 
-      authLogin(loginResponse.access_token, userData);
+      authLogin(loginResponse.access_token, loginResponse.refresh_token, userData);
 
       toast.success("Welcome back!");
       navigate("/");
@@ -66,7 +66,7 @@ export default function Login() {
                     headers: { Authorization: `Bearer ${oauthResponse.access_token}` },
                   });
 
-                  authLogin(oauthResponse.access_token, userData);
+                  authLogin(oauthResponse.access_token, oauthResponse.refresh_token, userData);
                   toast.success("Signed in with Google");
                   navigate("/");
                 } catch (error) {

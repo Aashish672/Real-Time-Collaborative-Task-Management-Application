@@ -68,14 +68,25 @@ def get_workspaces_slug(slug: str, db: Session = Depends(get_db), current_user: 
 
 
 @router.get("/{workspace_id}/statistics", response_model=schemas.WorkspaceStatisticsResponse, status_code=status.HTTP_200_OK)
-def workspace_statistics(workspace_id: uuid.UUID, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+async def workspace_statistics(workspace_id: uuid.UUID, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     workspace = crud.get_workspace(db=db, workspace_id=workspace_id)
     if not workspace:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     
     check_workspace_member(db, workspace_id, current_user.id)
     
+    # Try cache first
+    from app.services.cache import get_cached, set_cached
+    cache_key = f"ws_stats:{workspace_id}"
+    cached_stats = await get_cached(cache_key)
+    if cached_stats:
+        return cached_stats
+
     stats = crud.workspace_statistics(db=db, workspace_id=workspace_id)
+    
+    # Store in cache for 60 seconds
+    await set_cached(cache_key, stats, ttl=60)
+    
     return stats
 
 
@@ -145,12 +156,24 @@ async def create_invitation(
     check_workspace_admin(db, workspace_id, current_user.id)
     invitation = crud.create_invitation(db=db, workspace_id=workspace_id, invited_by_id=current_user.id, body=body)
     
-    # MOCK EMAIL LOGGING
-    print("\n" + "="*50)
-    print(f"INVITATION CREATED FOR: {body.email}")
-    print(f"LINK: http://localhost:5173/join/{invitation.token}")
-    print("="*50 + "\n")
-    
+    # Queue invitation email via RabbitMQ
+    try:
+        from app.services.email_service import publish_invitation_email
+        from app.core.rabbitmq import get_channel
+        workspace = crud.get_workspace(db=db, workspace_id=workspace_id)
+        channel = await get_channel()
+        await publish_invitation_email(
+            channel=channel,
+            email=body.email,
+            workspace_name=workspace.name,
+            inviter_name=current_user.full_name,
+            invite_token=invitation.token,
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to queue invitation email: {e}")
+        # Fallback: log the link so it's not lost
+        print(f"INVITATION LINK: http://localhost:5173/join/{invitation.token}")
     # Log Activity for Webhook/Notification
     await ActivityService.log_activity(
         db=db,

@@ -1,4 +1,4 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
@@ -38,10 +38,46 @@ async function api<T = unknown>(endpoint: string, options: ApiOptions = {}): Pro
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url.toString(), { headers, ...rest });
+  let response = await fetch(url.toString(), { headers, ...rest });
 
+  // Handle Token Expiry
   if (response.status === 401) {
+    const refreshToken = localStorage.getItem("refresh_token");
+    
+    if (refreshToken) {
+      try {
+        // Attempt to refresh the token
+        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+
+        if (refreshRes.ok) {
+          const { access_token, refresh_token: new_refresh_token } = await refreshRes.json();
+          localStorage.setItem("access_token", access_token);
+          localStorage.setItem("refresh_token", new_refresh_token);
+          
+          // Retry original request with NEW token
+          headers["Authorization"] = `Bearer ${access_token}`;
+          response = await fetch(url.toString(), { headers, ...rest });
+
+          // If retry also fails, give up
+          if (response.ok) {
+            if (response.status === 204) return undefined as T;
+            return response.json();
+          }
+        }
+      } catch (err) {
+        console.error("Refresh attempt failed", err);
+      }
+    }
+
+    // If we reach here, either no refresh token or refresh failed
     localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user_data");
+    
     const publicPaths = ["/login", "/signup"];
     if (!publicPaths.includes(window.location.pathname)) {
       window.location.href = "/login";

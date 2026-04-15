@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: User) => void;
+  login: (token: string, refreshToken: string, user: User) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -36,11 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = (newToken: string, refreshToken: string, newUser: User) => {
     // Clear any stale data from previous sessions first
     queryClient.clear();
     
     localStorage.setItem("access_token", newToken);
+    localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem("user_data", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
@@ -50,8 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Purge everything from memory
     queryClient.clear();
     
+    // Call backend logout synchronously if possible (optional hardening)
+    import("@/lib/api").then(({ api }) => {
+      api("/auth/logout", { method: "POST" }).catch(() => {});
+    });
+
     localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("user_data");
+    localStorage.removeItem("active_workspace_id");
     setToken(null);
     setUser(null);
   };

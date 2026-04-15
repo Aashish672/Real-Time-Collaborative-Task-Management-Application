@@ -3,7 +3,6 @@ from typing import Optional, Any
 from sqlalchemy.orm import Session
 from app import models, crud
 from app.services.socket_manager import manager
-from app.services.webhooks import trigger_workspace_webhooks
 from datetime import datetime, timezone
 
 class ActivityService:
@@ -78,10 +77,9 @@ class ActivityService:
             }
         )
 
-        # 5. Trigger Webhooks
+        # 5. Trigger Webhooks via RabbitMQ (async, non-blocking)
         webhook_event = ActivityService._get_webhook_event(action, entity_type)
         if webhook_event:
-            # Construct a useful payload for the webhook
             webhook_payload = {
                 "activity_id": str(activity.id),
                 "action": action,
@@ -91,7 +89,12 @@ class ActivityService:
                 "timestamp": activity.created_at.isoformat(),
                 "payload": payload or {}
             }
-            trigger_workspace_webhooks(db, workspace_id, webhook_event, webhook_payload)
+            try:
+                from app.services.webhooks import publish_webhook_to_queue
+                await publish_webhook_to_queue(db, workspace_id, webhook_event, webhook_payload)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to queue webhook: {e}")
 
         return activity
 

@@ -14,11 +14,23 @@ const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefin
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { data: workspaces = [], isLoading } = useWorkspaces();
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [activeWorkspaceId, _setActiveWorkspaceId] = useState<string | null>(() => {
+    return localStorage.getItem("active_workspace_id");
+  });
 
-  // Reset active workspace when user changes
+  const setActiveWorkspaceId = (id: string | null) => {
+    if (id) localStorage.setItem("active_workspace_id", id);
+    else localStorage.removeItem("active_workspace_id");
+    _setActiveWorkspaceId(id);
+  };
+
+  // Reset active workspace when user changes (only if it doesn't belong to them)
   useEffect(() => {
-    setActiveWorkspaceId(null);
+    if (user?.id) {
+       // Optional: verify current stored ws belongs to user
+    } else {
+       setActiveWorkspaceId(null);
+    }
   }, [user?.id]);
 
   // Set default workspace if none selected

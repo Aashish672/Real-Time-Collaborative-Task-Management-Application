@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Infrastructure
+  redis:
+    image: redis:7-alpine
+    container_name: tf-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: tf-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    container_name: tf-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  # Backend API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tf-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    volumes:
+      - ./backend/uploads:/app/uploads
+    restart: always
+
+  # Workers
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tf-email-worker
+    command: python -m app.worker.email_worker
+    env_file:
+      - ./backend/.env
+    depends_on:
+      rabbitmq:
+        condition: service_started
+    restart: always
+
+  webhook-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tf-webhook-worker
+    command: python -m app.worker.webhook_worker
+    env_file:
+      - ./backend/.env
+    depends_on:
+      rabbitmq:
+        condition: service_started
+    restart: always
+
+volumes:
+  redis_data:
+  rabbitmq_data:
+  postgres_data:
