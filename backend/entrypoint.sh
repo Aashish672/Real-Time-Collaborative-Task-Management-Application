@@ -27,8 +27,11 @@ except Exception as e:
 }
 
 # Wait for critical services
+echo "🌐 Diagnostic: Checking DNS resolution..."
+python -c "import socket; hosts=['db', 'cache', 'rabbitmq']; [print(f'{h}: {socket.gethostbyname(h)}') for h in hosts if socket.gethostbyname(h)]" || echo "⚠️ Some hosts could not be resolved yet."
+
 wait_for_service "db" 5432 "PostgreSQL"
-wait_for_service "redis" 6379 "Redis"
+wait_for_service "cache" 6379 "Redis"
 wait_for_service "rabbitmq" 5672 "RabbitMQ"
 
 # Always run migrations on startup (safe/idempotent thanks to recent fix)

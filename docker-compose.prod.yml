@@ -3,6 +3,8 @@ version: "3.8"
 services:
   db:
     image: postgres:15-alpine
+    container_name: taskflow_db
+    hostname: db
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -18,9 +20,13 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    networks:
+      - taskflow_network
 
-  redis:
+  cache:
     image: redis:7-alpine
+    container_name: taskflow_cache
+    hostname: cache
     restart: always
     command: redis-server --appendonly yes
     volumes:
@@ -30,9 +36,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - taskflow_network
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
+    container_name: taskflow_mq
+    hostname: rabbitmq
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: guest
@@ -45,70 +55,103 @@ services:
       timeout: 10s
       retries: 10
       start_period: 20s
+    networks:
+      - taskflow_network
 
-  # Migration (run manually in CI/CD)
+  # Migration (run manually in CI/CD or via entrypoint)
   migration:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: taskflow_migration
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/taskflow
     depends_on:
       db:
         condition: service_healthy
     command: alembic upgrade head
+    networks:
+      - taskflow_network
 
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: taskflow_api
+    hostname: api
     restart: always
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/taskflow
+      - REDIS_URL=redis://cache:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     command: gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --timeout 120
     depends_on:
       db:
         condition: service_healthy
-      redis:
+      cache:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
     volumes:
       - ./backend/uploads:/app/uploads
+    networks:
+      - taskflow_network
 
   email-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: taskflow_email_worker
     restart: always
     command: python -m app.worker.email_worker
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/taskflow
+      - REDIS_URL=redis://cache:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
       rabbitmq:
         condition: service_healthy
-      redis:
+      cache:
         condition: service_healthy
       db:
         condition: service_healthy
+    networks:
+      - taskflow_network
 
   webhook-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: taskflow_webhook_worker
     restart: always
     command: python -m app.worker.webhook_worker
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/taskflow
+      - REDIS_URL=redis://cache:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
       rabbitmq:
         condition: service_healthy
-      redis:
+      cache:
         condition: service_healthy
       db:
         condition: service_healthy
+    networks:
+      - taskflow_network
+
+networks:
+  taskflow_network:
+    driver: bridge
 
 volumes:
   postgres_data_prod:
