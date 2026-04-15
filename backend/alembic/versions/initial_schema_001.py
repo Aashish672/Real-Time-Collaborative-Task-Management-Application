@@ -16,14 +16,33 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    # Enums
-    op.execute("CREATE TYPE workspacerole AS ENUM ('owner', 'admin', 'member', 'viewer')")
-    op.execute("CREATE TYPE invitationstatus AS ENUM ('pending', 'accepted', 'revoked')")
-    op.execute("CREATE TYPE projectstatus AS ENUM ('active', 'archived', 'in_progress', 'completed')")
-    op.execute("CREATE TYPE taskstatus AS ENUM ('todo', 'in_progress', 'in_review', 'canceled', 'done')")
-    op.execute("CREATE TYPE taskpriority AS ENUM ('low', 'medium', 'high', 'urgent')")
-    op.execute("CREATE TYPE activityaction AS ENUM ('created', 'updated', 'deleted', 'completed', 'commented', 'assigned', 'moved')")
-    op.execute("CREATE TYPE notificationtype AS ENUM ('task_assigned', 'comment_mentioned', 'project_updated', 'deadline_reminder', 'workspace_joined')")
+    # Enums (Postgres-safe idempotency)
+    op.execute("""
+        DO $$ 
+        BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'workspacerole') THEN
+                CREATE TYPE workspacerole AS ENUM ('owner', 'admin', 'member', 'viewer');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invitationstatus') THEN
+                CREATE TYPE invitationstatus AS ENUM ('pending', 'accepted', 'revoked');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'projectstatus') THEN
+                CREATE TYPE projectstatus AS ENUM ('active', 'archived', 'in_progress', 'completed');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'taskstatus') THEN
+                CREATE TYPE taskstatus AS ENUM ('todo', 'in_progress', 'in_review', 'canceled', 'done');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'taskpriority') THEN
+                CREATE TYPE taskpriority AS ENUM ('low', 'medium', 'high', 'urgent');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'activityaction') THEN
+                CREATE TYPE activityaction AS ENUM ('created', 'updated', 'deleted', 'completed', 'commented', 'assigned', 'moved');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notificationtype') THEN
+                CREATE TYPE notificationtype AS ENUM ('task_assigned', 'comment_mentioned', 'project_updated', 'deadline_reminder', 'workspace_joined');
+            END IF;
+        END $$;
+    """)
 
     # --- Users Table ---
     op.create_table(
