@@ -8,19 +8,20 @@ jobs:
   deploy-frontend:
     name: Build & Deploy Frontend (S3)
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          
+          node-version: "20"
+
       - name: Install Dependencies
         run: |
           cd frontend/project-flow
           npm install
-          
+
       - name: Build Frontend
         env:
           VITE_API_BASE_URL: http://${{ secrets.EC2_HOST }}:8000
@@ -28,7 +29,7 @@ jobs:
         run: |
           cd frontend/project-flow
           npm run build
-          
+
       - name: Deploy to S3
         uses: jakejarvis/s3-sync-action@master
         with:
@@ -38,11 +39,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          SOURCE_DIR: 'frontend/project-flow/dist'
+          SOURCE_DIR: "frontend/project-flow/dist"
 
   deploy-backend:
     name: Deploy Backend & Workers (EC2)
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -51,12 +53,27 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
+
             project_dir="Real-Time-Collaborative-Task-Management-Application"
+
             if [ ! -d "$project_dir" ]; then
               git clone https://github.com/Aashish672/$project_dir.git
             fi
+
             cd "$project_dir"
+
             git fetch origin main
             git reset --hard origin/main
-            docker compose -f docker-compose.prod.yml up -d --build
+
+            # Build images
+            docker compose -f docker-compose.prod.yml build
+
+            # Run migrations (CRITICAL STEP)
+            docker compose -f docker-compose.prod.yml run --rm migration
+
+            # Start services
+            docker compose -f docker-compose.prod.yml up -d
+
+            # Cleanup unused images
             docker image prune -f
