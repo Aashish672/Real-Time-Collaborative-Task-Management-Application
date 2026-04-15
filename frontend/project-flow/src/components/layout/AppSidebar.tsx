@@ -16,7 +16,7 @@ import CreateWorkspaceModal from "../dashboard/CreateWorkspaceModal";
 import CreateProjectModal from "../kanban/CreateProjectModal";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "My Tasks", icon: CheckSquare, path: "/my-tasks" },
   { label: "Notifications", icon: Bell, path: "/notifications" },
 ];
