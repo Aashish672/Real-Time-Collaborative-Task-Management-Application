@@ -10,3 +10,4 @@ venv/
 build/
 dist/
 node_modules/
+AWS_SETUP_GUIDE.md
