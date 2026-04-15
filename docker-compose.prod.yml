@@ -7,9 +7,11 @@ services:
     container_name: tf-db-prod
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: taskflow
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=taskflow
+    env_file:
+      - .env.prod
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     healthcheck:
