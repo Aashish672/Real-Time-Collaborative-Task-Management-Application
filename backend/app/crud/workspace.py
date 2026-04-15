@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app import models,schemas
 import uuid,string,secrets
 import re
+from datetime import datetime, timedelta
 
 def generate_slug(name:str):
     slug=re.sub(r'[^a-zA-Z0-9]+', '-', name.lower()).strip('-')
@@ -18,7 +19,12 @@ def create_workspace(db:Session,body:schemas.WorkspaceCreate,user_id:uuid.UUID):
         counter+=1
     
 
-    new_workspace=models.Workspace(name=body.name,slug=final_slug,owner_id=user_id)
+    new_workspace=models.Workspace(
+        name=body.name,
+        slug=final_slug,
+        logo_url=body.logo_url,
+        owner_id=user_id
+    )
     db.add(new_workspace)
     db.flush()
     
@@ -157,3 +163,190 @@ def remove_member(db:Session,workspace_id:uuid.UUID,user_id:uuid.UUID):
     db.delete(member)
     db.commit()
     return member
+
+def create_invitation(db: Session, workspace_id: uuid.UUID, invited_by_id: uuid.UUID, body: schemas.InvitationCreate):
+    # PATH A: Check if user already exists
+    existing_user = db.query(models.User).filter(models.User.email == body.email).first()
+    if existing_user:
+        # Check if already a member
+        is_member = db.query(models.WorkspaceMember).filter(
+            models.WorkspaceMember.workspace_id == workspace_id,
+            models.WorkspaceMember.user_id == existing_user.id
+        ).first()
+        
+        if not is_member:
+            new_member = models.WorkspaceMember(
+                workspace_id=workspace_id,
+                user_id=existing_user.id,
+                role=models.WorkspaceRole(body.role.value)
+            )
+            db.add(new_member)
+            
+            # Create Notification
+            inviter = db.query(models.User).filter(models.User.id == invited_by_id).first()
+            workspace = db.query(models.Workspace).filter(models.Workspace.id == workspace_id).first()
+            
+            from app.crud.notification import create_notification
+            create_notification(
+                db=db,
+                user_id=existing_user.id,
+                notification_type=models.NotificationType.workspace_joined,
+                payload={
+                    "message": f"You've been added to {workspace.name} by {inviter.full_name}",
+                    "workspace_id": str(workspace_id),
+                    "workspace_name": workspace.name,
+                    "actor_name": inviter.full_name
+                }
+            )
+            db.commit()
+            
+        # Return a mock invitation that looks "accepted" or just enough to satisfy the schema
+        # Actually, it's better to return a placeholder or update the schema.
+        # For now, let's create a "ghost" invitation that is already accepted.
+        invitation = models.Invitation(
+            email=body.email,
+            workspace_id=workspace_id,
+            invited_by_id=invited_by_id,
+            role=models.WorkspaceRole(body.role.value),
+            token=f"direct-{uuid.uuid4()}",
+            expires_at=datetime.now(),
+            status=models.InvitationStatus.accepted
+        )
+        db.add(invitation)
+        db.commit()
+        db.refresh(invitation)
+        return invitation
+
+    # PATH B: Traditional Invitation
+    # Check if a pending invitation already exists for this email and workspace
+    existing = db.query(models.Invitation).filter(
+        models.Invitation.workspace_id == workspace_id,
+        models.Invitation.email == body.email,
+        models.Invitation.status == models.InvitationStatus.pending,
+        models.Invitation.expires_at > datetime.now()
+    ).first()
+    
+    if existing:
+        return existing
+        
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now() + timedelta(days=7)
+    
+    new_invitation = models.Invitation(
+        email=body.email,
+        workspace_id=workspace_id,
+        invited_by_id=invited_by_id,
+        role=models.WorkspaceRole(body.role.value),
+        token=token,
+        expires_at=expires_at,
+        status=models.InvitationStatus.pending
+    )
+    
+    db.add(new_invitation)
+    db.commit()
+    db.refresh(new_invitation)
+    return new_invitation
+
+def get_invitation_by_token(db: Session, token: str):
+    return db.query(models.Invitation).filter(models.Invitation.token == token).first()
+
+def accept_invitation(db: Session, token: str, user: models.User):
+    invitation = get_invitation_by_token(db, token)
+    if not invitation or invitation.status != models.InvitationStatus.pending or invitation.expires_at < datetime.now():
+        return None
+    
+    # 1. Add user to workspace
+    # check if already a member
+    existing_member = db.query(models.WorkspaceMember).filter(
+        models.WorkspaceMember.workspace_id == invitation.workspace_id,
+        models.WorkspaceMember.user_id == user.id
+    ).first()
+    
+    if not existing_member:
+        new_member = models.WorkspaceMember(
+            workspace_id=invitation.workspace_id,
+            user_id=user.id,
+            role=invitation.role
+        )
+        db.add(new_member)
+    
+    # 2. Mark invitation as accepted
+    invitation.status = models.InvitationStatus.accepted
+    db.commit()
+    return invitation
+
+def revoke_invitation(db: Session, invitation_id: uuid.UUID):
+    invitation = db.query(models.Invitation).filter(models.Invitation.id == invitation_id).first()
+    if invitation:
+        invitation.status = models.InvitationStatus.revoked
+        db.commit()
+        return True
+    return False
+
+def list_workspace_invitations(db: Session, workspace_id: uuid.UUID):
+    return db.query(models.Invitation).filter(
+        models.Invitation.workspace_id == workspace_id,
+        models.Invitation.status == models.InvitationStatus.pending
+    ).all()
+
+
+def search_workspace(db: Session, workspace_id: uuid.UUID, query: str):
+    # Search Projects
+    projects = db.query(models.Project).filter(
+        models.Project.workspace_id == workspace_id,
+        models.Project.name.ilike(f"%{query}%")
+    ).limit(10).all()
+
+    # Search Tasks (joined with Project to filter by workspace)
+    tasks = db.query(models.Task).join(models.Project).filter(
+        models.Project.workspace_id == workspace_id,
+        (models.Task.title.ilike(f"%{query}%")) | (models.Task.description.ilike(f"%{query}%"))
+    ).limit(20).all()
+
+    return {
+        "projects": projects,
+        "tasks": tasks
+    }
+
+
+def list_workspace_activity(db: Session, workspace_id: uuid.UUID, limit: int = 50, skip: int = 0):
+    return db.query(models.Activity).filter(
+        models.Activity.workspace_id == workspace_id
+    ).order_by(models.Activity.created_at.desc()).offset(skip).limit(limit).all()
+
+
+# --- Webhook CRUD ---
+
+def create_webhook(db: Session, workspace_id: uuid.UUID, body: schemas.WebhookCreate):
+    new_webhook = models.Webhook(
+        workspace_id=workspace_id,
+        url=body.url,
+        event_type=body.event_type
+    )
+    db.add(new_webhook)
+    db.commit()
+    db.refresh(new_webhook)
+    return new_webhook
+
+
+def list_workspaces_webhooks(db: Session, workspace_id: uuid.UUID):
+    return db.query(models.Webhook).filter(models.Webhook.workspace_id == workspace_id).all()
+
+
+def delete_webhook(db: Session, webhook_id: uuid.UUID):
+    webhook = db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
+    if webhook:
+        db.delete(webhook)
+        db.commit()
+        return True
+    return False
+
+
+def toggle_webhook(db: Session, webhook_id: uuid.UUID):
+    webhook = db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
+    if webhook:
+        webhook.is_active = not webhook.is_active
+        db.commit()
+        db.refresh(webhook)
+        return webhook
+    return None

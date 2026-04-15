@@ -10,6 +10,7 @@ class UserRegistration(BaseModel):
     email:EmailStr
     password:str
     full_name:str
+    invite_token: str | None = None
 
 
     @field_validator("password")
@@ -59,6 +60,8 @@ class UserBase(BaseModel):
     email:EmailStr
     full_name:str
     avatar_url:str|None=None
+    headline:str|None=None
+    profile_visibility:str="public"
 
 
 class UserPublic(UserBase):
@@ -77,12 +80,13 @@ class UserMe(UserPublic):
 class UserUpdate(BaseModel):
     full_name:str|None=None
     avatar_url:str|None=None
+    headline:str|None=None
+    profile_visibility:str|None=None
 
 
 class UserOAuth(BaseModel):
-    email:EmailStr
-    full_name:str|None=None
-    avatar_url:Optional[str]=None
+    credential: str
+    invite_token: Optional[str] = None
 
 class ChangePassword(BaseModel):
     current_password: str

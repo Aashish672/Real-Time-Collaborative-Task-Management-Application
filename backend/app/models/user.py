@@ -16,6 +16,8 @@ class User(Base):
 
     full_name=Column(String,nullable=False)
     avatar_url=Column(String,nullable=True)
+    headline=Column(String,nullable=True)
+    profile_visibility=Column(String,default="public",nullable=False) # "public" or "private"
 
 
     created_at=Column(TIMESTAMP,server_default=func.now(),nullable=False)

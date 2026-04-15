@@ -9,6 +9,11 @@ from pwdlib.hashers.bcrypt import BcryptHasher
 
 import string,secrets
 from app.crud.security import create_access_token, create_refresh_token
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from decouple import config
+
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="YOUR_GOOGLE_CLIENT_ID")
 
 pwd_context = PasswordHash((BcryptHasher(),))
 
@@ -25,7 +30,27 @@ def verify_password(plain_password:str,hashed_password:str):
     return pwd_context.verify(plain_password,hashed_password)
 
 
-from app.crud.workspace import create_workspace
+def verify_google_token(token: str):
+    try:
+        # Verify the ID token using Google's verification library
+        idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+        
+        # ID token is valid. Get the user's Google ID from the decoded token.
+        return {
+            "email": idinfo['email'],
+            "full_name": idinfo.get('name'),
+            "avatar_url": idinfo.get('picture'),
+            "email_verified": idinfo.get('email_verified')
+        }
+    except ValueError:
+        # Invalid token
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google token"
+        )
+
+
+from app.crud.workspace import create_workspace, accept_invitation
 
 def register(db:Session,body:schemas.UserRegistration):
     is_user=db.query(models.User).filter(models.User.email==body.email).first()
@@ -46,28 +71,40 @@ def register(db:Session,body:schemas.UserRegistration):
         user_id=new_user.id
     )
 
+    # PATH B: Handle Invitation
+    if body.invite_token:
+        accept_invitation(db=db, token=body.invite_token, user=new_user)
+
     return new_user
 
 
 def oauth_register(db:Session,body:schemas.UserOAuth):
-    is_user=db.query(models.User).filter(models.User.email==body.email).first()
+    # PATH A: Verify Token
+    google_data = verify_google_token(body.credential)
+    email = google_data["email"]
+    full_name = google_data["full_name"]
+    avatar_url = google_data["avatar_url"]
+
+    is_user = db.query(models.User).filter(models.User.email == email).first()
 
     if is_user:
-        if body.avatar_url and not is_user.avatar_url:
-            is_user.avatar_url=body.avatar_url
+        # Update avatar if missing
+        if avatar_url and not is_user.avatar_url:
+            is_user.avatar_url = avatar_url
             db.commit()
             db.refresh(is_user)
         return is_user
     
-    random_password=generate_random_password()
-    hashed_password=get_password_hash(random_password)
+    random_password = generate_random_password()
+    hashed_password = get_password_hash(random_password)
 
-
-    new_user=models.User(email=body.email,
-                         hashed_password=hashed_password,
-                         full_name=body.full_name,
-                         avatar_url=body.avatar_url,
-                         is_verified=True)
+    new_user = models.User(
+        email=email,
+        hashed_password=hashed_password,
+        full_name=full_name,
+        avatar_url=avatar_url,
+        is_verified=True
+    )
     
     db.add(new_user)
     db.commit()
@@ -79,6 +116,10 @@ def oauth_register(db:Session,body:schemas.UserOAuth):
         body=schemas.WorkspaceCreate(name=f"{new_user.full_name}'s Workspace"), 
         user_id=new_user.id
     )
+
+    # PATH B: Handle Invitation
+    if body.invite_token:
+        accept_invitation(db=db, token=body.invite_token, user=new_user)
 
     return new_user
 
@@ -122,7 +163,8 @@ def get_workspace_users(db:Session,workspace_id:uuid.UUID):
 def update_profile(db:Session,user_id:uuid.UUID,body:schemas.UserUpdate):
     user=get_user_by_id(user_id=user_id,db=db)
     if user:
-        user.full_name=body.full_name 
+        for key, value in body.model_dump(exclude_unset=True).items():
+            setattr(user, key, value)
         db.commit()
         db.refresh(user)
     return user

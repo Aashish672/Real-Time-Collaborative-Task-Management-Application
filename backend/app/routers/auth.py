@@ -14,10 +14,20 @@ def register(body:schemas.UserRegistration,db:Session=Depends(get_db)):
     return user
 
 
-@auth_routes.post("/oauth",response_model=schemas.UserPublic,status_code=status.HTTP_200_OK)
-def oauth_register(body:schemas.UserOAuth,db:Session=Depends(get_db)):
-    user=crud.oauth_register(db=db,body=body)
-    return user
+@auth_routes.post("/oauth", response_model=schemas.TokenResponse, status_code=status.HTTP_200_OK)
+def oauth_register(body: schemas.UserOAuth, db: Session = Depends(get_db)):
+    user = crud.oauth_register(db=db, body=body)
+    
+    # Generate tokens directly for OAuth
+    from app.crud.security import create_access_token, create_refresh_token
+    access_token = create_access_token({"sub": str(user.id)})
+    refresh_token = create_refresh_token({"sub": str(user.id)})
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
 
 
 @auth_routes.post("/login",response_model=schemas.TokenResponse,status_code=status.HTTP_200_OK)

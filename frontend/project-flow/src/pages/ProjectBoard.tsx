@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Plus, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Task } from "@/types/kanban";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useKanban } from "@/hooks/useKanban";
 import { useProject } from "@/hooks/useApi";
+import { useWorkspaceSocket } from "@/hooks/useWorkspaceSocket";
 import KanbanBoard from "@/components/kanban/KanbanBoard";
 import AddTaskModal from "@/components/kanban/AddTaskModal";
 import FilterDropdown from "@/components/kanban/FilterDropdown";
@@ -13,7 +14,13 @@ import TaskDetailModal from "@/components/kanban/TaskDetailModal";
 
 export default function ProjectBoard() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const taskIdParam = searchParams.get("task");
+  
   const { activeWorkspaceId } = useWorkspace();
+  
+  // Initialize Real-Time Sync
+  useWorkspaceSocket(activeWorkspaceId);
   const { data: project, isLoading: projectLoading } = useProject(id || "");
   const {
     allTasks,
@@ -32,6 +39,25 @@ export default function ProjectBoard() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Deep-linking: Open task modal if taskId is in URL
+  useEffect(() => {
+    if (taskIdParam && allTasks.length > 0) {
+      const task = allTasks.find((t) => t.id === taskIdParam);
+      if (task) {
+        setSelectedTask(task);
+      }
+    }
+  }, [taskIdParam, allTasks]);
+
+  const handleCloseDetail = () => {
+    setSelectedTask(null);
+    if (taskIdParam) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("task");
+      setSearchParams(newParams);
+    }
+  };
 
   const projectName = project?.name || (projectLoading ? "Loading project..." : "Project Board");
   const isLoading = projectLoading || tasksLoading;
@@ -97,7 +123,7 @@ export default function ProjectBoard() {
         <TaskDetailModal
           task={currentTask}
           open={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={handleCloseDetail}
           onUpdate={updateTask}
           members={members}
           labels={labels}

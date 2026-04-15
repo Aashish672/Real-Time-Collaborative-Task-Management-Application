@@ -128,6 +128,65 @@ export const useRemoveMember = (workspaceId: string) => {
   });
 };
 
+// --- INVITATIONS ---
+
+export const useWorkspaceInvitations = (workspaceId?: string) => {
+  return useQuery({
+    queryKey: ["workspaces", workspaceId, "invitations"],
+    queryFn: () => api<any[]>(`/workspaces/${workspaceId}/invitations`),
+    enabled: !!workspaceId,
+  });
+};
+
+export const useInviteMember = (workspaceId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { email: string; role: string }) =>
+      api<any>(`/workspaces/${workspaceId}/invitations`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "invitations"] });
+    },
+  });
+};
+
+export const useRevokeInvitation = (workspaceId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (invitationId: string) =>
+      api<any>(`/workspaces/invitations/${invitationId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "invitations"] });
+    },
+  });
+};
+
+export const useInvitationInfo = (token: string | undefined) => {
+  return useQuery({
+    queryKey: ["invitation_info", token],
+    queryFn: () => api<any>(`/workspaces/invitations/info/${token}`),
+    enabled: !!token,
+    retry: false,
+  });
+};
+
+export const useAcceptInvitation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) =>
+      api<any>(`/workspaces/invitations/accept/${token}`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+};
+
 export const useWorkspaces = () => {
   return useQuery({
     queryKey: ["workspaces"],
@@ -140,10 +199,49 @@ export const useWorkspaces = () => {
 export const useCreateWorkspace = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; slug: string; description?: string }) =>
+    mutationFn: (data: { name: string; slug: string; logo_url?: string; description?: string }) =>
       api<any>("/workspaces/", {
         method: "POST",
         body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+};
+
+export const useCurrentWorkspace = () => {
+  // Simple helper to find current workspace from URL or localStorage
+  // For now, we'll extract it from the URL if possible, or just use the first one from list
+  const { data: workspaces } = useWorkspaces();
+  const slug = window.location.pathname.split('/')[1];
+  
+  if (!workspaces) return { data: null };
+  const current = workspaces.find(w => w.slug === slug) || workspaces[0];
+  return { data: current };
+};
+
+export const useUpdateWorkspace = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ workspaceId, ...data }: { workspaceId: string; name?: string; slug?: string; logo_url?: string | null }) =>
+      api<any>(`/workspaces/${workspaceId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.setQueryData(["workspace_stats", data.id], data);
+    },
+  });
+};
+
+export const useDeleteWorkspace = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (workspaceId: string) =>
+      api<void>(`/workspaces/${workspaceId}`, {
+        method: "DELETE",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
@@ -326,7 +424,7 @@ export const useCreateComment = (projectId: string) => {
     mutationFn: ({ taskId, text }: { taskId: string; text: string }) =>
       api<any>(`/tasks/${taskId}/comments`, {
         method: "POST",
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ body: text }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
@@ -366,8 +464,8 @@ export const useCreateSubtask = (projectId: string) => {
 export const useToggleSubtask = (projectId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ subtaskId }: { subtaskId: string }) =>
-      api<any>(`/subtasks/${subtaskId}/toggle`, {
+    mutationFn: ({ taskId, subtaskId }: { taskId: string; subtaskId: string }) =>
+      api<any>(`/tasks/${taskId}/subtasks/${subtaskId}/toggle`, {
         method: "PATCH",
       }),
     onSuccess: () => {
@@ -379,8 +477,8 @@ export const useToggleSubtask = (projectId: string) => {
 export const useDeleteSubtask = (projectId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (subtaskId: string) =>
-      api<any>(`/subtasks/${subtaskId}`, {
+    mutationFn: ({ taskId, subtaskId }: { taskId: string; subtaskId: string }) =>
+      api<any>(`/tasks/${taskId}/subtasks/${subtaskId}`, {
         method: "DELETE",
       }),
     onSuccess: () => {
@@ -388,3 +486,98 @@ export const useDeleteSubtask = (projectId: string) => {
     },
   });
 };
+
+// --- ATTACHMENTS ---
+
+export const useTaskAttachments = (taskId?: string) => {
+  return useQuery({
+    queryKey: ["tasks", taskId, "attachments"],
+    queryFn: () => api<any[]>(`/tasks/${taskId}/attachments`),
+    enabled: !!taskId,
+  });
+};
+
+export const useUploadAttachment = (projectId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, file }: { taskId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      return api<any>(`/tasks/${taskId}/attachments/upload`, {
+        method: "POST",
+        body: formData,
+      });
+    },
+    onSuccess: (_, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", taskId, "attachments"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+    },
+  });
+};
+
+export const useDeleteAttachment = (projectId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (attachmentId: string) =>
+      api<any>(`/attachments/${attachmentId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] }); // Invalidate all task queries for simplicity, or specific if known
+    },
+  });
+};
+
+// --- Webhooks ---
+
+export function useWorkspaceWebhooks(workspaceId?: string) {
+  return useQuery({
+    queryKey: ["workspaces", workspaceId, "webhooks"],
+    queryFn: () => api<any[]>(`/workspaces/${workspaceId}/webhooks`),
+    enabled: !!workspaceId,
+  });
+}
+
+export function useCreateWebhook(workspaceId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { url: string; event_type: string }) =>
+      api<any>(`/workspaces/${workspaceId}/webhooks`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "webhooks"] });
+    },
+  });
+}
+
+export function useDeleteWebhook(workspaceId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (webhookId: string) =>
+      api<void>(`/workspaces/webhooks/${webhookId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "webhooks"] });
+    },
+  });
+}
+
+export function useToggleWebhook(workspaceId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (webhookId: string) =>
+      api<any>(`/workspaces/webhooks/${webhookId}/toggle`, { method: "PATCH" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "webhooks"] });
+    },
+  });
+}
+
+export function useTestWebhook() {
+  return useMutation({
+    mutationFn: (webhookId: string) =>
+      api<any>(`/workspaces/webhooks/${webhookId}/test`, { method: "POST" }),
+  });
+}

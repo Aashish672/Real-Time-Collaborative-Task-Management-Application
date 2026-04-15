@@ -9,4 +9,6 @@ python-multipart
 python-decouple
 email-validator
 pwdlib[bcrypt]
-
+httpx
+google-auth
+

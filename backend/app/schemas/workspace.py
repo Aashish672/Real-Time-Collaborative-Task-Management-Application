@@ -19,6 +19,7 @@ class WorkspaceMemberResponse(WorkspaceMemberBase):
 
 class WorkspaceBase(BaseModel):
     name: str
+    logo_url: Optional[str] = None
 
 
 class WorkspaceCreate(WorkspaceBase):
@@ -27,7 +28,8 @@ class WorkspaceCreate(WorkspaceBase):
 
 
 class WorkspaceUpdate(BaseModel):
-    name: str | None = None
+    name: Optional[str] = None
+    logo_url: Optional[str] = None
 
 
 class WorkspaceResponse(WorkspaceBase):
@@ -57,3 +59,23 @@ class WorkspaceRole(str, enum.Enum):
     admin = "admin"
     member = "member"
     viewer = "viewer"
+
+
+class WebhookBase(BaseModel):
+    url: str
+    event_type: str
+
+
+class WebhookCreate(WebhookBase):
+    pass
+
+
+class WebhookUpdate(BaseModel):
+    is_active: bool
+
+
+class WebhookResponse(WebhookBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    is_active: bool

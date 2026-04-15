@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useWorkspaces } from "@/hooks/useApi";
+import { useAuth } from "@/context/AuthContext";
 
 interface WorkspaceContextType {
   activeWorkspaceId: string | null;
@@ -11,8 +12,14 @@ interface WorkspaceContextType {
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const { data: workspaces = [], isLoading } = useWorkspaces();
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+
+  // Reset active workspace when user changes
+  useEffect(() => {
+    setActiveWorkspaceId(null);
+  }, [user?.id]);
 
   // Set default workspace if none selected
   useEffect(() => {

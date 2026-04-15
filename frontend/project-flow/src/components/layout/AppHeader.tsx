@@ -1,27 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Bell, LogOut, User, CheckCheck, Tag } from "lucide-react";
+import { Search, Bell, LogOut, User, CheckCheck, Tag, Info } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import UserAvatar from "@/components/shared/UserAvatar";
 import LabelManagementModal from "../kanban/LabelManagementModal";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-
-interface Notification {
-  id: string;
-  text: string;
-  actor: string;
-  time: string;
-  read: boolean;
-}
-
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  { id: "n1", text: 'assigned you to "Fix Auth Bug"', actor: "Sarah Kim", time: "2m ago", read: false },
-  { id: "n2", text: "commented on \"API endpoints\"", actor: "Bob Lee", time: "15m ago", read: false },
-  { id: "n3", text: "AI Breakdown completed for \"Set up auth flow\"", actor: "System", time: "1h ago", read: false },
-  { id: "n4", text: 'moved "Design onboarding" to In Review', actor: "Diana Patel", time: "3h ago", read: true },
-  { id: "n5", text: "invited you to project \"Mobile App v2\"", actor: "Carlos Diaz", time: "1d ago", read: true },
-];
+import { useNotifications } from "@/hooks/useNotifications";
+import { formatDistanceToNow } from "date-fns";
 
 export default function AppHeader() {
   const { user, logout } = useAuth();
@@ -29,28 +15,8 @@ export default function AppHeader() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [labelsModalOpen, setLabelsModalOpen] = useState(false);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const markRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  };
+  
+  const { notifications, unreadCount, markRead, markAllRead, isLoading } = useNotifications();
 
   const handleLogout = () => {
     logout();
@@ -99,8 +65,9 @@ export default function AppHeader() {
                 <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
                 {unreadCount > 0 && (
                   <button
-                    onClick={markAllRead}
-                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium sidebar-transition"
+                    onClick={() => markAllRead.mutate()}
+                    disabled={markAllRead.isPending}
+                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium sidebar-transition disabled:opacity-50"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
                     Mark all as read
@@ -110,34 +77,49 @@ export default function AppHeader() {
 
               {/* List */}
               <div className="max-h-[340px] overflow-y-auto">
-                {notifications.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => markRead(n.id)}
-                    className={cn(
-                      "flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-accent/50 sidebar-transition border-b border-border/50 last:border-0",
-                      !n.read && "bg-primary/5"
-                    )}
-                  >
-                    {n.actor === "System" ? (
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <Bell className="h-3.5 w-3.5" />
-                      </div>
-                    ) : (
-                      <UserAvatar name={n.actor} size="sm" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-foreground leading-snug">
-                        <span className="font-semibold">{n.actor}</span>{" "}
-                        <span className="text-muted-foreground">{n.text}</span>
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{n.time}</p>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <div className="h-10 w-10 bg-muted rounded-full flex items-center justify-center text-muted-foreground mb-3">
+                      <Bell className="h-5 w-5" />
                     </div>
-                    {!n.read && (
-                      <div className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
-                    )}
-                  </button>
-                ))}
+                    <p className="text-xs font-semibold text-foreground">All caught up!</p>
+                    <p className="text-[10px] text-muted-foreground">No new notifications at the moment.</p>
+                  </div>
+                ) : (
+                  notifications.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => markRead.mutate(n.id)}
+                      disabled={markRead.isPending}
+                      className={cn(
+                        "flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-accent/50 sidebar-transition border-b border-border/50 last:border-0",
+                        !n.is_read && "bg-primary/5"
+                      )}
+                    >
+                      <UserAvatar name={n.payload?.actor_name || "System"} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground leading-snug">
+                          <span className="font-semibold">{n.payload?.actor_name || "Someone"}</span>{" "}
+                          <span className="text-muted-foreground">
+                            {n.type === "task_assigned" && `assigned you to "${n.payload?.task_title}"`}
+                            {n.type === "comment_mentioned" && `commented on "${n.payload?.task_title}"`}
+                            {n.type === "project_updated" && `updated project details`}
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                        </p>
+                      </div>
+                      {!n.is_read && (
+                        <div className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
+                      )}
+                    </button>
+                  ))
+                )}
               </div>
 
               {/* Footer */}

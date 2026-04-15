@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
@@ -27,9 +27,12 @@ async function api<T = unknown>(endpoint: string, options: ApiOptions = {}): Pro
   const token = localStorage.getItem("access_token");
 
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...((customHeaders as Record<string, string>) || {}),
   };
+
+  if (!(rest.body instanceof FormData)) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import type { Priority } from "@/types/kanban";
 import UserAvatar from "@/components/shared/UserAvatar";
+import LabelManagementModal from "./LabelManagementModal";
+import { Plus } from "lucide-react";
 
 const PRIORITIES: { value: Priority; label: string }[] = [
   { value: "high", label: "High" },
@@ -24,6 +26,7 @@ export default function AddTaskModal({ open, onClose, onAdd, members, labels }: 
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [isLabelsModalOpen, setIsLabelsModalOpen] = useState(false);
 
   if (!open) return null;
 
@@ -93,7 +96,17 @@ export default function AddTaskModal({ open, onClose, onAdd, members, labels }: 
 
           {/* Labels */}
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Labels</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-foreground">Labels</label>
+              <button
+                type="button"
+                onClick={() => setIsLabelsModalOpen(true)}
+                className="text-[11px] font-medium text-primary hover:text-primary/80 flex items-center gap-1 sidebar-transition"
+              >
+                <Plus className="h-3 w-3" />
+                Manage
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {labels.map((l: any) => (
                 <button
@@ -151,6 +164,11 @@ export default function AddTaskModal({ open, onClose, onAdd, members, labels }: 
           </div>
         </form>
       </div>
+
+      <LabelManagementModal
+        open={isLabelsModalOpen}
+        onClose={() => setIsLabelsModalOpen(false)}
+      />
     </div>
   );
 }

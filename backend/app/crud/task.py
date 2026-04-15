@@ -103,6 +103,7 @@ def task_statistics(db:Session,project_id:uuid.UUID):
         "progress_percentage": progress
     }
 
+
 def update_task(db:Session,task_id:uuid.UUID,body:schemas.TaskUpdate):
     task=get_task(db,task_id)
     if not task:
@@ -114,6 +115,7 @@ def update_task(db:Session,task_id:uuid.UUID,body:schemas.TaskUpdate):
 
     db.commit()
     db.refresh(task)
+        
     return task
 
 
@@ -121,9 +123,11 @@ def update_task_status(db:Session,task_id:uuid.UUID,status:str):
     task=get_task(db,task_id)
     if not task:
         return None
+    
     task.status=status
     db.commit()
     db.refresh(task)
+
     return task
 
 

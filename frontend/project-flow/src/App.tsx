@@ -15,6 +15,7 @@ import Profile from "@/pages/Profile";
 import TeamManagement from "@/pages/TeamManagement";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import InvitationJoin from "@/pages/InvitationJoin";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/join/:token" element={<InvitationJoin />} />
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/my-tasks" element={<MyTasks />} />

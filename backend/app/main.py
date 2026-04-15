@@ -1,12 +1,20 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.database import Base, engine
-from app.routers import auth, user as user_router, workspaces, projects, tasks, comments, label, notifications, attachment
+from app.routers import auth, user as user_router, workspaces, projects, tasks, comments, label, notifications, attachment, websockets
+
+# Ensure uploads directory exists
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 import traceback
 from fastapi import FastAPI, Request
@@ -47,3 +55,4 @@ app.include_router(comments.router)
 app.include_router(label.router)
 app.include_router(notifications.router)
 app.include_router(attachment.router)
+app.include_router(websockets.router)

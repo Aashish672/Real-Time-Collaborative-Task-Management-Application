@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { User, Activity, CreditCard, Shield, Globe, Lock, Mail, ExternalLink } from "lucide-react";
+import { User, Activity, CreditCard, Shield, Globe, Lock, Mail, ExternalLink, Save } from "lucide-react";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { cn } from "@/lib/utils";
 import { useProfile, useUpdateProfile, useAssignedTasks } from "@/hooks/useApi";
+import ActivityFeed from "@/components/shared/ActivityFeed";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 type Tab = "profile" | "activity" | "cards";
@@ -24,9 +26,14 @@ export default function Profile() {
 
     // Local state for editing (though we'd typically use a form library or just sync with mutation)
     const [name, setName] = useState(user?.full_name || "");
+    const [headline, setHeadline] = useState(user?.headline || "");
 
     useEffect(() => {
-        if (user) setName(user.full_name);
+        if (user) {
+            setName(user.full_name);
+            setHeadline(user.headline || "");
+            setVisibility(user.profile_visibility as "public" | "private" || "public");
+        }
     }, [user]);
 
     const handleUpdateProfile = async (updates: any) => {
@@ -51,7 +58,7 @@ export default function Profile() {
             {/* Header */}
             <div className="flex flex-col md:flex-row items-center gap-6 mb-10">
                 <div className="relative group p-1 rounded-full border-2 border-primary/20 bg-background shadow-lg">
-                    <UserAvatar name={user?.full_name || "User"} src={user?.avatar_url} size="xl" className="h-24 w-24 md:h-32 md:w-32" />
+                    <UserAvatar name={user?.full_name || "User"} src={user?.avatar_url} size="md" />
                     <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-xs font-medium opacity-0 group-hover:opacity-100 rounded-full cursor-pointer transition-opacity">
                         Change Avatar
                         <input type="file" className="hidden" />
@@ -113,12 +120,24 @@ export default function Profile() {
                                                 onChange={(e) => setName(e.target.value)}
                                                 placeholder="Your full name"
                                             />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase">Headline</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                className="flex-1 bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                                                value={headline}
+                                                onChange={(e) => setHeadline(e.target.value)}
+                                                placeholder="e.g. Senior Product Designer"
+                                            />
                                             <button 
-                                                onClick={() => handleUpdateProfile({ full_name: name })}
-                                                disabled={updateProfile.isPending || name === user?.full_name}
-                                                className="px-3 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                                                onClick={() => handleUpdateProfile({ full_name: name, headline: headline })}
+                                                disabled={updateProfile.isPending || (name === user?.full_name && headline === (user?.headline || ""))}
+                                                className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center gap-1.5"
                                             >
-                                                Save
+                                                <Save className="h-3 w-3" />
+                                                Save Updates
                                             </button>
                                         </div>
                                     </div>
@@ -138,10 +157,13 @@ export default function Profile() {
                                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">Visibility</h3>
                                 <div className="space-y-4">
                                     <div
-                                        onClick={() => setVisibility("public")}
+                                        onClick={() => {
+                                            setVisibility("public");
+                                            handleUpdateProfile({ profile_visibility: "public" });
+                                        }}
                                         className={cn(
-                                            "flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all",
-                                            visibility === "public" ? "border-primary bg-primary/5" : "border-border hover:border-border/80"
+                                            "flex items-center gap-4 p-4 rounded-xl border-2 transition-all",
+                                            visibility === "public" ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-border/80"
                                         )}
                                     >
                                         <div className="h-10 w-10 flex items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -155,10 +177,13 @@ export default function Profile() {
                                     </div>
 
                                     <div
-                                        onClick={() => setVisibility("private")}
+                                        onClick={() => {
+                                            setVisibility("private");
+                                            handleUpdateProfile({ profile_visibility: "private" });
+                                        }}
                                         className={cn(
                                             "flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all",
-                                            visibility === "private" ? "border-primary bg-primary/5" : "border-border hover:border-border/80"
+                                            visibility === "private" ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-border/80"
                                         )}
                                     >
                                         <div className="h-10 w-10 flex items-center justify-center rounded-full bg-secondary text-muted-foreground">
@@ -200,23 +225,8 @@ export default function Profile() {
                 )}
 
                 {activeTab === "activity" && (
-                    <div className="max-w-2xl space-y-8">
-                        {MOCK_ACTIVITY.map((item, idx) => (
-                            <div key={item.id} className="relative pl-8 group">
-                                {idx !== MOCK_ACTIVITY.length - 1 && (
-                                    <div className="absolute left-[11px] top-6 bottom-[-20px] w-px bg-border" />
-                                )}
-                                <div className="absolute left-0 top-1 h-[22px] w-[22px] rounded-full border-2 border-primary/20 bg-background flex items-center justify-center">
-                                    <div className="h-2 w-2 rounded-full bg-primary" />
-                                </div>
-                                <div className="p-3 rounded-lg hover:bg-secondary/20 transition-colors">
-                                    <p className="text-sm text-foreground leading-relaxed">
-                                        You <span className="font-medium">{item.action}</span> <span className="text-primary font-semibold underline underline-offset-4 decoration-primary/30">{item.target}</span> {item.context}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1.5">{item.time}</p>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="max-w-2xl bg-card border border-border rounded-2xl p-6 shadow-sm">
+                        <ActivityFeed />
                     </div>
                 )}
 

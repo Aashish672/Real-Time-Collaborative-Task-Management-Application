@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 import uuid
@@ -13,6 +14,7 @@ from app.dependencies.workspace import (
     check_workspace_admin,
     check_workspace_owner
 )
+from app.services.activity_service import ActivityService
 
 
 router = APIRouter(prefix="/workspaces", tags=["Workspaces"])
@@ -131,6 +133,125 @@ def delete_workspace(workspace_id: uuid.UUID, db: Session = Depends(get_db), cur
     return None
 
 
+# --- Invitation Routes ---
+
+@router.post("/{workspace_id}/invitations", response_model=schemas.InvitationResponse, status_code=status.HTTP_201_CREATED)
+async def create_invitation(
+    workspace_id: uuid.UUID, 
+    body: schemas.InvitationCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    check_workspace_admin(db, workspace_id, current_user.id)
+    invitation = crud.create_invitation(db=db, workspace_id=workspace_id, invited_by_id=current_user.id, body=body)
+    
+    # MOCK EMAIL LOGGING
+    print("\n" + "="*50)
+    print(f"INVITATION CREATED FOR: {body.email}")
+    print(f"LINK: http://localhost:5173/join/{invitation.token}")
+    print("="*50 + "\n")
+    
+    # Log Activity for Webhook/Notification
+    await ActivityService.log_activity(
+        db=db,
+        workspace_id=workspace_id,
+        user_id=current_user.id,
+        action=models.ActivityAction.created,
+        entity_type="invitation",
+        entity_id=invitation.id,
+        payload={"email": body.email, "role": body.role}
+    )
+    
+    return invitation
+
+
+@router.get("/{workspace_id}/invitations", response_model=List[schemas.InvitationResponse])
+def list_invitations(
+    workspace_id: uuid.UUID, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    check_workspace_admin(db, workspace_id, current_user.id)
+    return crud.list_workspace_invitations(db=db, workspace_id=workspace_id)
+
+
+@router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_invitation(
+    invitation_id: uuid.UUID, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    # We need to find the workspace first to check admin rights
+    invitation = db.query(models.Invitation).filter(models.Invitation.id == invitation_id).first()
+    if not invitation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation not found")
+    
+    check_workspace_admin(db, invitation.workspace_id, current_user.id)
+    crud.revoke_invitation(db=db, invitation_id=invitation_id)
+    return None
+
+
+@router.get("/invitations/info/{token}", response_model=schemas.InvitationInfo)
+def get_invitation_info(token: str, db: Session = Depends(get_db)):
+    invitation = crud.get_invitation_by_token(db=db, token=token)
+    if not invitation or invitation.status != models.InvitationStatus.pending:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid or expired invitation link")
+    
+    workspace = crud.get_workspace(db=db, workspace_id=invitation.workspace_id)
+    inviter = db.query(models.User).filter(models.User.id == invitation.invited_by_id).first()
+    
+    return {
+        "workspace_name": workspace.name,
+        "inviter_name": inviter.full_name if inviter else "Someone",
+        "email": invitation.email,
+        "expires_at": invitation.expires_at,
+        "is_expired": invitation.expires_at < datetime.now()
+    }
+
+
+@router.post("/invitations/accept/{token}", response_model=schemas.WorkspaceResponse)
+def accept_invitation(
+    token: str, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    invitation = crud.accept_invitation(db=db, token=token, user=current_user)
+    if not invitation:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not accept invitation. Link might be expired or already used.")
+    
+    workspace = crud.get_workspace(db=db, workspace_id=invitation.workspace_id)
+    return workspace
+
+
+@router.get("/{workspace_id}/search", response_model=schemas.GlobalSearchResponse)
+def search(
+    workspace_id: uuid.UUID,
+    q: str = "",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Ensure user is member
+    check_workspace_member(db, workspace_id, current_user.id)
+    
+    if not q or len(q) < 2:
+        return {"projects": [], "tasks": []}
+        
+    return crud.search_workspace(db=db, workspace_id=workspace_id, query=q)
+
+
+@router.get("/{workspace_id}/activity", response_model=List[schemas.ActivityResponse])
+def get_workspace_activity(
+    workspace_id: uuid.UUID,
+    limit: int = 50,
+    skip: int = 0,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Ensure user is member
+    check_workspace_member(db, workspace_id, current_user.id)
+    return crud.list_workspace_activity(db=db, workspace_id=workspace_id, limit=limit, skip=skip)
+
+
 @router.delete("/{workspace_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_member(workspace_id: uuid.UUID, user_id: uuid.UUID, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     workspace = crud.get_workspace(db=db, workspace_id=workspace_id)
@@ -143,3 +264,82 @@ def remove_member(workspace_id: uuid.UUID, user_id: uuid.UUID, db: Session = Dep
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     return None
+
+
+# --- Webhook Routes ---
+
+@router.post("/{workspace_id}/webhooks", response_model=schemas.WebhookResponse, status_code=status.HTTP_201_CREATED)
+def create_webhook(
+    workspace_id: uuid.UUID,
+    body: schemas.WebhookCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    check_workspace_admin(db, workspace_id, current_user.id)
+    return crud.create_webhook(db=db, workspace_id=workspace_id, body=body)
+
+
+@router.get("/{workspace_id}/webhooks", response_model=List[schemas.WebhookResponse])
+def list_webhooks(
+    workspace_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    check_workspace_member(db, workspace_id, current_user.id)
+    return crud.list_workspaces_webhooks(db=db, workspace_id=workspace_id)
+
+
+@router.delete("/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_webhook(
+    webhook_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Need to check admin for the workspace this webhook belongs to
+    webhook = db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
+    if not webhook:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    
+    check_workspace_admin(db, webhook.workspace_id, current_user.id)
+    crud.delete_webhook(db=db, webhook_id=webhook_id)
+    return None
+
+
+@router.patch("/webhooks/{webhook_id}/toggle", response_model=schemas.WebhookResponse)
+def toggle_webhook(
+    webhook_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    webhook = db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
+    if not webhook:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    
+    check_workspace_admin(db, webhook.workspace_id, current_user.id)
+    return crud.toggle_webhook(db=db, webhook_id=webhook_id)
+
+
+@router.post("/webhooks/{webhook_id}/test", status_code=status.HTTP_200_OK)
+def test_webhook(
+    webhook_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    webhook = db.query(models.Webhook).filter(models.Webhook.id == webhook_id).first()
+    if not webhook:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    
+    check_workspace_admin(db, webhook.workspace_id, current_user.id)
+    
+    from app.services.webhooks import dispatch_webhook
+    # Send a ping/test payload
+    dispatch_webhook(
+        url=webhook.url,
+        event_type="webhook.test",
+        payload={
+            "message": "This is a test notification from your Task Management app.",
+            "webhook_id": str(webhook_id),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+    return {"status": "dispatched"}

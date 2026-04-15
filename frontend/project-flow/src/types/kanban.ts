@@ -10,7 +10,7 @@ export interface Label {
 export interface Subtask {
   id: string;
   title: string;
-  completed: boolean;
+  is_done: boolean;
 }
 
 export interface Comment {
@@ -22,9 +22,11 @@ export interface Comment {
 
 export interface Attachment {
   id: string;
-  name: string;
-  type: string;
-  size: string;
+  task_id: string;
+  user_id: string | null;
+  filename: string;
+  url: string;
+  uploaded_at: string;
 }
 
 export interface Task {

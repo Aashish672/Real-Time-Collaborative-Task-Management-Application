@@ -3,6 +3,7 @@ import { useWorkspace } from "@/context/WorkspaceContext";
 import { useProfile, useWorkspaceStatistics } from "@/hooks/useApi";
 import ProjectGrid from "@/components/dashboard/ProjectGrid";
 import TeamPanel from "@/components/dashboard/TeamPanel";
+import ActivityFeed from "@/components/shared/ActivityFeed";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -60,11 +61,25 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Project Grid */}
-      <ProjectGrid />
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+            {/* Project Grid */}
+            <ProjectGrid />
+            
+            {/* Team Panel */}
+            <TeamPanel />
+        </div>
 
-      {/* Team Panel */}
-      <TeamPanel />
+        <div className="space-y-4">
+           <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Recent Activity</h2>
+           </div>
+           <div className="rounded-xl border border-border bg-card p-6 min-h-[400px]">
+              <ActivityFeed />
+           </div>
+        </div>
+      </div>
     </div>
   );
 }

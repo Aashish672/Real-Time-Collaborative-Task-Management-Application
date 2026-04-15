@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 class NotificationBase(BaseModel):
-    payload: str
+    payload: dict | str
     is_read: bool = False
 
 class NotificationUpdate(BaseModel):

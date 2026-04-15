@@ -1,28 +1,41 @@
 import { useState } from "react";
-import { Users, Mail, ShieldCheck, MoreVertical, Plus, UserPlus } from "lucide-react";
+import { Users, Mail, ShieldCheck, MoreVertical, Plus, UserPlus, X, Clock } from "lucide-react";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/context/WorkspaceContext";
-import { useWorkspaceMembers, useUpdateMemberRole, useRemoveMember } from "@/hooks/useApi";
+import { 
+  useWorkspaceMembers, 
+  useUpdateMemberRole, 
+  useRemoveMember,
+  useWorkspaceInvitations,
+  useInviteMember,
+  useRevokeInvitation
+} from "@/hooks/useApi";
 
 export default function TeamManagement() {
     const { activeWorkspaceId } = useWorkspace();
-    const { data: members = [], isLoading } = useWorkspaceMembers(activeWorkspaceId || undefined);
+    const { data: members = [], isLoading: membersLoading } = useWorkspaceMembers(activeWorkspaceId || undefined);
+    const { data: invitations = [], isLoading: invitesLoading } = useWorkspaceInvitations(activeWorkspaceId || undefined);
     
     const updateRoleMutation = useUpdateMemberRole(activeWorkspaceId || "");
     const removeMemberMutation = useRemoveMember(activeWorkspaceId || "");
+    const inviteMutation = useInviteMember(activeWorkspaceId || "");
+    const revokeInvitationMutation = useRevokeInvitation(activeWorkspaceId || "");
 
     const [inviteEmail, setInviteEmail] = useState("");
-    const [inviteRole, setInviteRole] = useState<"Member" | "Viewer">("Member");
+    const [inviteRole, setInviteRole] = useState<"member" | "viewer">("member");
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!inviteEmail.trim()) return;
         
-        // Mocking invitation since backend doesn't have an invite-by-email for non-existent users yet
-        toast.info("Invitation feature coming soon (Backend logic needed for new users)");
-        setInviteEmail("");
+        try {
+            await inviteMutation.mutateAsync({ email: inviteEmail, role: inviteRole });
+            toast.success("Invitation sent!");
+            setInviteEmail("");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to send invitation");
+        }
     };
 
     const handleRoleChange = async (userId: string, newRole: string) => {
@@ -52,46 +65,52 @@ export default function TeamManagement() {
         }
     };
 
-    if (isLoading) {
+    const handleRevokeInvitation = async (invitationId: string) => {
+        try {
+            await revokeInvitationMutation.mutateAsync(invitationId);
+            toast.success("Invitation revoked");
+        } catch (err: any) {
+             toast.error("Failed to revoke invitation");
+        }
+    };
+
+    if (membersLoading || invitesLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
+            <div className="flex items-center justify-center min-vh-[400px]">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
             </div>
         );
     }
 
     return (
-        <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="max-w-5xl mx-auto px-4 py-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
                 <div>
-                    <h1 className="text-3xl font-bold text-foreground">Team Members</h1>
+                    <h1 className="text-3xl font-bold text-foreground">Team Management</h1>
                     <p className="text-muted-foreground mt-1">Manage who has access to this workspace and their permissions.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex -space-x-3 overflow-hidden">
-                        {members.filter(m => m.status === "active").slice(0, 5).map(m => (
-                            <div key={m.id} className="inline-block h-8 w-8 rounded-full ring-2 ring-background">
-                                <UserAvatar name={m.name} size="sm" />
-                            </div>
-                        ))}
-                    </div>
                     <span className="text-sm font-medium text-muted-foreground">
-                        {members.length} total members
+                        {members.length} active members
                     </span>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Members List */}
-                <div className="lg:col-span-2 space-y-4">
+                <div className="lg:col-span-2 space-y-8">
                     <div className="rounded-xl border border-border bg-card overflow-hidden">
+                        <div className="px-5 py-4 border-b border-border bg-muted/20">
+                            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4 text-primary" /> Active Members
+                            </h2>
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-secondary/30 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
                                         <th className="px-5 py-3 border-b border-border">Name</th>
                                         <th className="px-5 py-3 border-b border-border">Role</th>
-                                        <th className="px-5 py-3 border-b border-border">Status</th>
                                         <th className="px-5 py-3 border-b border-border text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -109,18 +128,8 @@ export default function TeamManagement() {
                                             </td>
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-1.5">
-                                                    {member.role === "admin" || member.role === "owner" ? (
-                                                        <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                                                    ) : (
-                                                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    )}
                                                     <span className="text-xs font-medium text-foreground capitalize">{member.role}</span>
                                                 </div>
-                                            </td>
-                                            <td className="px-5 py-4">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-500">
-                                                    Active
-                                                </span>
                                             </td>
                                             <td className="px-5 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -136,6 +145,7 @@ export default function TeamManagement() {
                                                     <button 
                                                         onClick={() => handleRemoveMember(member.user_id)}
                                                         className="p-1 rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+                                                        title="Remove Member"
                                                     >
                                                         <MoreVertical className="h-4 w-4" />
                                                     </button>
@@ -147,16 +157,62 @@ export default function TeamManagement() {
                             </table>
                         </div>
                     </div>
+
+                    {invitations.length > 0 && (
+                        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+                            <div className="px-5 py-4 border-b border-border bg-muted/20">
+                                <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-amber-500" /> Pending Invitations
+                                </h2>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-secondary/30 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                                            <th className="px-5 py-3 border-b border-border">Email</th>
+                                            <th className="px-5 py-3 border-b border-border">Role</th>
+                                            <th className="px-5 py-3 border-b border-border text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {invitations.map((invite: any) => (
+                                            <tr key={invite.id} className="group hover:bg-accent/30 transition-colors">
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 rounded-full bg-muted">
+                                                            <Mail className="h-4 w-4 text-muted-foreground" />
+                                                        </div>
+                                                        <span className="text-sm font-medium text-foreground">{invite.email}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className="text-xs text-muted-foreground capitalize">{invite.role}</span>
+                                                </td>
+                                                <td className="px-5 py-4 text-right">
+                                                    <button 
+                                                        onClick={() => handleRevokeInvitation(invite.id)}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-tight text-destructive hover:bg-destructive/10 transition-colors"
+                                                    >
+                                                        <X className="h-3 w-3" /> Revoke
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Invite Sidebar */}
                 <div className="space-y-6">
-                    <div className="p-6 rounded-xl border border-border bg-card shadow-sm">
+                    <div className="p-6 rounded-xl border border-border bg-card shadow-sm sticky top-24">
                         <div className="flex items-center gap-2 mb-4">
                             <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
                                 <UserPlus className="h-5 w-5" />
                             </div>
-                            <h3 className="text-sm font-bold text-foreground">Invite People</h3>
+                            <h3 className="text-sm font-bold text-foreground">Invite New Peer</h3>
                         </div>
                         <form onSubmit={handleInvite} className="space-y-4">
                             <div>
@@ -167,41 +223,39 @@ export default function TeamManagement() {
                                         type="email"
                                         value={inviteEmail}
                                         onChange={(e) => setInviteEmail(e.target.value)}
-                                        className="w-full bg-secondary/30 border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                                        className="w-full bg-secondary/30 border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
                                         placeholder="colleague@company.com"
                                         required
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-muted-foreground mb-1.5">Work Role</label>
+                                <label className="block text-[10px] font-bold uppercase text-muted-foreground mb-1.5">Workspace Role</label>
                                 <select
                                     value={inviteRole}
                                     onChange={(e) => setInviteRole(e.target.value as any)}
                                     className="w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
                                 >
-                                    <option value="Member">Member</option>
-                                    <option value="Viewer">Viewer</option>
+                                    <option value="member">Member</option>
+                                    <option value="viewer">Viewer</option>
+                                    <option value="admin">Admin</option>
                                 </select>
                             </div>
                             <button
                                 type="submit"
-                                className="w-full py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20"
+                                disabled={inviteMutation.isPending}
+                                className="w-full py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Send Invitation
+                                {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
                             </button>
                         </form>
                     </div>
 
-                    <div className="p-6 rounded-xl border border-border bg-gradient-to-br from-secondary/30 to-background">
-                        <h3 className="text-[10px] font-bold uppercase text-muted-foreground mb-3 tracking-widest">Shareable Link</h3>
-                        <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-                            Allow others to join this workspace by sharing a private link. You can reset this at any time.
+                    <div className="p-6 rounded-xl border border-border bg-gradient-to-br from-muted/50 to-background">
+                        <h3 className="text-xs font-bold text-foreground mb-3">Invitation Tip</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Once sent, the user will receive a link to join this workspace. The link is valid for 7 days.
                         </p>
-                        <button className="flex items-center gap-2 text-xs font-bold text-primary hover:underline">
-                            Copy join link
-                            <Plus className="h-3 w-3" />
-                        </button>
                     </div>
                 </div>
             </div>

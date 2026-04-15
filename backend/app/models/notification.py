@@ -10,6 +10,7 @@ class NotificationType(enum.Enum):
     comment_mentioned = "comment_mentioned"
     project_updated = "project_updated"
     deadline_reminder = "deadline_reminder"
+    workspace_joined = "workspace_joined"
 
 class Notification(Base):
     __tablename__="notifications"
