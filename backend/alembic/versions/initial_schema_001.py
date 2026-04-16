@@ -102,6 +102,18 @@ def upgrade():
     )
 
     # -----------------------------
+    # WEBHOOKS
+    # -----------------------------
+    op.create_table(
+        "webhooks",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("workspace_id", sa.UUID(), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("url", sa.String(), nullable=False),
+        sa.Column("event_type", sa.String(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+    )
+
+    # -----------------------------
     # INVITATIONS
     # -----------------------------
     op.create_table(
@@ -297,6 +309,7 @@ def downgrade():
     op.drop_table("tasks")
     op.drop_table("projects")
     op.drop_table("invitations")
+    op.drop_table("webhooks")
     op.drop_table("workspace_members")
     op.drop_table("workspaces")
     op.drop_table("users")
