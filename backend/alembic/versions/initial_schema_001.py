@@ -176,9 +176,124 @@ def upgrade():
         sa.Column("updated_at", sa.TIMESTAMP(), server_default=sa.func.now(), nullable=False),
     )
 
+    # -----------------------------
+    # TASK ASSIGNEES
+    # -----------------------------
+    op.create_table(
+        "task_assignees",
+        sa.Column("task_id", sa.UUID(), sa.ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column("user_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column("assigned_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
+    # -----------------------------
+    # LABELS
+    # -----------------------------
+    op.create_table(
+        "labels",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("workspace_id", sa.UUID(), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("color", sa.String(), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
+    # -----------------------------
+    # TASK LABELS (Link Table)
+    # -----------------------------
+    op.create_table(
+        "task_labels",
+        sa.Column("task_id", sa.UUID(), sa.ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column("label_id", sa.UUID(), sa.ForeignKey("labels.id", ondelete="CASCADE"), primary_key=True),
+    )
+
+    # -----------------------------
+    # COMMENTS
+    # -----------------------------
+    op.create_table(
+        "comments",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("task_id", sa.UUID(), sa.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("body", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
+    # -----------------------------
+    # SUBTASKS
+    # -----------------------------
+    op.create_table(
+        "subtasks",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("task_id", sa.UUID(), sa.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("title", sa.String(), nullable=False),
+        sa.Column("is_done", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
+    # -----------------------------
+    # ATTACHMENTS
+    # -----------------------------
+    op.create_table(
+        "attachments",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("task_id", sa.UUID(), sa.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("filename", sa.String(), nullable=False),
+        sa.Column("url", sa.String(), nullable=False),
+        sa.Column("uploaded_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
+    # -----------------------------
+    # NOTIFICATIONS
+    # -----------------------------
+    op.create_table(
+        "notifications",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("user_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "type",
+            postgresql.ENUM("task_assigned", "comment_mentioned", "project_updated", "deadline_reminder", "workspace_joined", name="notificationtype", create_type=False),
+            nullable=False,
+        ),
+        sa.Column("payload", sa.JSON(), nullable=False),
+        sa.Column("is_read", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
+    # -----------------------------
+    # ACTIVITIES
+    # -----------------------------
+    op.create_table(
+        "activities",
+        sa.Column("id", sa.UUID(), primary_key=True),
+        sa.Column("workspace_id", sa.UUID(), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("project_id", sa.UUID(), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=True),
+        sa.Column("user_id", sa.UUID(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "action",
+            postgresql.ENUM("created", "updated", "deleted", "completed", "commented", "assigned", "moved", name="activityaction", create_type=False),
+            nullable=False,
+        ),
+        sa.Column("entity_type", sa.String(), nullable=False),
+        sa.Column("entity_id", sa.UUID(), nullable=True),
+        sa.Column("payload", sa.JSON(), nullable=True),
+        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
+    )
+
 
 def downgrade():
     # Drop tables (reverse order)
+    op.drop_table("activities")
+    op.drop_table("notifications")
+    op.drop_table("attachments")
+    op.drop_table("subtasks")
+    op.drop_table("comments")
+    op.drop_table("task_labels")
+    op.drop_table("labels")
+    op.drop_table("task_assignees")
     op.drop_table("tasks")
     op.drop_table("projects")
     op.drop_table("invitations")
