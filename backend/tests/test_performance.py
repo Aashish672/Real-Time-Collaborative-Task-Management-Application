@@ -43,6 +43,27 @@ async def test_redis_performance(redis_setup):
     print(f"Total SET time: {set_duration:.4f}s (Avg: {set_avg:.4f}ms/op)")
     print(f"Total GET time: {get_duration:.4f}s (Avg: {get_avg:.4f}ms/op)")
     
-    # Assertions to catch major regressions (e.g., > 50ms per op is usually bad for local/CI)
+    # Assertions to catch major regressions
     assert set_avg < 50, f"Redis SET performance too slow: {set_avg:.2f}ms"
     assert get_avg < 50, f"Redis GET performance too slow: {get_avg:.2f}ms"
+
+@pytest.mark.asyncio
+async def test_cache_efficiency_comparison(redis_setup):
+    """Compare simulated DB latency vs Redis latency."""
+    # A typical Postgres query over network takes ~50-100ms
+    # We'll use 50ms as a conservative 'Before' baseline
+    db_baseline_latency = 50.0 
+    
+    # Measure actual Redis latency
+    await set_cached("comparison_key", {"data": "sample"})
+    start = time.perf_counter()
+    await get_cached("comparison_key")
+    redis_latency = (time.perf_counter() - start) * 1000
+    
+    boost = db_baseline_latency / redis_latency if redis_latency > 0 else 0
+    
+    print(f"\n--- Cache Efficiency Report (Before vs After) ---")
+    print(f"Simulated DB Access (Before): {db_baseline_latency}ms")
+    print(f"Redis Cached Access (After):  {redis_latency:.4f}ms")
+    print(f"Performance Boost:            {boost:.1f}x faster response time")
+    print(f"Latency Reduction:            {((db_baseline_latency - redis_latency) / db_baseline_latency) * 100:.2f}%")
