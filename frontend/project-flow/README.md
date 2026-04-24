@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# TaskFlow - Task Management Application
 
-TODO: Document your project here
+A full-featured task management application with Kanban boards, AI-powered task breakdown, real-time collaboration, and webhook integrations.

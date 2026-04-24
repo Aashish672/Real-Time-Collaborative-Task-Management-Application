@@ -32,7 +32,7 @@ async def disconnect_redis():
     """Call during FastAPI lifespan shutdown."""
     global redis_client
     if redis_client:
-        await redis_client.close()
+        await redis_client.aclose()
         redis_client = None
         print("🔌 Redis disconnected")
 

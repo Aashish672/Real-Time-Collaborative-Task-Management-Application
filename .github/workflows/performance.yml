@@ -1,0 +1,55 @@
+name: Redis Performance Benchmark
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run Application Performance Tests
+        env:
+          REDIS_URL: redis://localhost:6379/0
+          PYTHONPATH: ./backend
+        run: |
+          pytest backend/tests/test_performance.py -s
+
+      - name: Run Redis Benchmark (Stress Test)
+        run: |
+          echo "--- Standard Redis Benchmark ---"
+          redis-benchmark -h localhost -p 6379 -t set,get -n 100000 -q
+
+      - name: Check Redis Slow Log
+        run: |
+          echo "--- Redis Slow Log (Operations > 10ms) ---"
+          redis-cli -h localhost -p 6379 slowlog get 10
